@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NavBar } from "./components/NavBar";
 import { StatusBar } from "./components/StatusBar";
 import { Dashboard } from "./pages/Dashboard";
+import { FundDetail } from "./pages/FundDetail";
 import { Watchlists } from "./pages/Watchlists";
 import { Signals } from "./pages/Signals";
 import { Strategies } from "./pages/Strategies";
@@ -20,6 +21,7 @@ export function AppRoutes() {
         <Route path="/watchlists" element={<Watchlists />} />
         <Route path="/signals" element={<Signals />} />
         <Route path="/strategies" element={<Strategies />} />
+        <Route path="/funds/:code" element={<FundDetail />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>

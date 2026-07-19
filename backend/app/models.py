@@ -60,3 +60,24 @@ class SystemStatus(BaseModel):
     strategies_running: int = 0
     funds_watched: int = 0
     connected: bool = True
+
+
+class FundDetail(Fund):
+    """Fund with enriched detail for the detail page."""
+    type: Optional[str] = None
+    scale: Optional[float] = None
+    established_date: Optional[str] = None
+    latest_nav: float = 0.0
+    latest_nav_date: Optional[str] = None
+    daily_change: float = 0.0
+
+
+class NavPoint(BaseModel):
+    date: str
+    netvalue: float
+
+
+class StrategyState(BaseModel):
+    name: str
+    description: str
+    enabled: bool = True

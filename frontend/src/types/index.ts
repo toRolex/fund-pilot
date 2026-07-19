@@ -52,3 +52,23 @@ export interface SystemStatus {
   funds_watched: number;
   connected: boolean;
 }
+
+export interface FundDetail extends Fund {
+  type: string;
+  scale: number | null;
+  established_date: string | null;
+  latest_nav: number;
+  latest_nav_date: string | null;
+  daily_change: number;
+}
+
+export interface NavPoint {
+  date: string;
+  netvalue: number;
+}
+
+export interface StrategyState {
+  name: string;
+  description: string;
+  enabled: boolean;
+}

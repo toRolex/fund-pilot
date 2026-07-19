@@ -8,9 +8,9 @@ from fastapi.staticfiles import StaticFiles
 import xalpha as xa
 
 from app.data import load_fund_price
-from app.models import AddFundRequest, Fund, SearchResult, SignalResponse, StrategyToggleRequest, SystemStatus
+from app.models import AddFundRequest, Fund, FundDetail, NavPoint, SearchResult, SignalResponse, StrategyState, StrategyToggleRequest, SystemStatus
 from app.scheduler import get_cache, start as start_scheduler, stop as stop_scheduler
-from app.strategies import get_logs, get_strategy, list_strategies, toggle_enabled
+from app.strategies import get_fund_enabled_strategies, get_logs, get_strategy, list_strategies, toggle_enabled, toggle_fund_strategy
 from app.watchlist import WatchlistService
 
 # API sub-app
@@ -127,7 +127,6 @@ async def get_status():
         funds_watched=len(watchlist.list_all()),
         connected=True,
     )
->>>>>>> feature/14-refresh-statusbar
 
 
 @api.get("/signals")
@@ -178,6 +177,138 @@ async def get_signals(code: Optional[str] = Query(None)):
 
     signals.sort(key=lambda s: (s.date, s.fund_code))
     return signals
+
+
+@api.get("/funds/{code}")
+async def get_fund_detail(code: str):
+    """Fund detail with meta info, latest NAV, and daily change."""
+    fund = watchlist.get(code)
+    if not fund:
+        raise HTTPException(status_code=404, detail=f"Fund {code} not found")
+
+    # ponytail: single xa.mfund call, add retry/circuit-breaker if network flakiness matters
+    try:
+        info = xa.mfund(code).info
+    except Exception:
+        info = {}
+
+    price_df = load_fund_price(code)
+
+    latest_nav = 0.0
+    latest_nav_date = None
+    daily_change = 0.0
+
+    if len(price_df) > 0:
+        sorted_price = price_df.sort_values("date")
+        latest_row = sorted_price.iloc[-1]
+        latest_nav = round(float(latest_row["netvalue"]), 4)
+        raw_date = latest_row["date"]
+        latest_nav_date = raw_date.strftime("%Y-%m-%d") if hasattr(raw_date, "strftime") else str(raw_date)
+
+        if len(price_df) >= 2:
+            prev_row = sorted_price.iloc[-2]
+            prev_nav = float(prev_row["netvalue"])
+            daily_change = round((latest_nav - prev_nav) / prev_nav * 100, 2) if prev_nav != 0 else 0.0
+
+    return FundDetail(
+        code=fund.code,
+        name=fund.name,
+        type=info.get("fund_type", fund.type or ""),
+        scale=info.get("fund_scale"),
+        established_date=info.get("established_date"),
+        latest_nav=latest_nav,
+        latest_nav_date=latest_nav_date,
+        daily_change=daily_change,
+    )
+
+
+@api.get("/funds/{code}/signals")
+async def get_fund_signals(code: str):
+    """Historical signals for a specific fund."""
+    fund = watchlist.get(code)
+    if not fund:
+        raise HTTPException(status_code=404, detail=f"Fund {code} not found")
+
+    price_df = load_fund_price(code)
+    daily_change = 0.0
+    if len(price_df) >= 2:
+        sorted_price = price_df.sort_values("date")
+        daily_change = round(
+            (sorted_price.iloc[-1]["netvalue"] - sorted_price.iloc[-2]["netvalue"])
+            / sorted_price.iloc[-2]["netvalue"] * 100,
+            2,
+        )
+
+    signals: list[SignalResponse] = []
+    enabled = get_fund_enabled_strategies(code)
+    for sm in list_strategies():
+        if not enabled.get(sm.name, True):
+            continue
+        fn = get_strategy(sm.name)
+        result = fn(price_df)
+        for s in result:
+            signals.append(SignalResponse(
+                date=s.date,
+                fund_code=fund.code,
+                fund_name=fund.name,
+                strategy_name=s.strategy_name,
+                signal_type=s.signal_type,
+                confidence=s.confidence,
+                daily_change=daily_change,
+            ))
+
+    signals.sort(key=lambda s: s.date)
+    return signals
+
+
+@api.get("/funds/{code}/nav")
+async def get_fund_nav(code: str):
+    """NAV time series data for charting."""
+    fund = watchlist.get(code)
+    if not fund:
+        raise HTTPException(status_code=404, detail=f"Fund {code} not found")
+
+    price_df = load_fund_price(code)
+    sorted_price = price_df.sort_values("date")
+
+    points = []
+    for _, row in sorted_price.iterrows():
+        raw_date = row["date"]
+        date_str = raw_date.strftime("%Y-%m-%d") if hasattr(raw_date, "strftime") else str(raw_date)
+        points.append(NavPoint(date=date_str, netvalue=round(float(row["netvalue"]), 4)))
+
+    return points
+
+
+@api.get("/funds/{code}/strategies")
+async def get_fund_strategies(code: str):
+    """List all strategies with enabled/disabled state for this fund."""
+    fund = watchlist.get(code)
+    if not fund:
+        raise HTTPException(status_code=404, detail=f"Fund {code} not found")
+
+    enabled_map = get_fund_enabled_strategies(code)
+    return [
+        StrategyState(
+            name=sm.name,
+            description=sm.description,
+            enabled=enabled_map.get(sm.name, True),
+        )
+        for sm in list_strategies()
+    ]
+
+
+@api.put("/funds/{code}/strategies/{strategy_name}")
+async def fund_strategy_toggle(code: str, strategy_name: str):
+    """Toggle a strategy on/off for a fund."""
+    fund = watchlist.get(code)
+    if not fund:
+        raise HTTPException(status_code=404, detail=f"Fund {code} not found")
+    try:
+        enabled = toggle_fund_strategy(code, strategy_name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Strategy '{strategy_name}' not found")
+    return {"name": strategy_name, "enabled": enabled}
 
 
 # Main app — mounts API and SPA

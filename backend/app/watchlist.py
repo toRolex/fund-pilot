@@ -73,3 +73,7 @@ class WatchlistService:
             for f in _WATCHLIST.values()
             if q_lower in f.code.lower() or q_lower in f.name.lower()
         ]
+
+    def get(self, code: str) -> Fund | None:
+        """Get a fund by code, returns None if not found."""
+        return _WATCHLIST.get(code)

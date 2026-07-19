@@ -30,6 +30,9 @@ def _add_log(message: str):
 def get_logs(limit: int = 50) -> list[StrategyLog]:
     return _logs[-limit:]
 
+# ponytail: in-memory per-fund strategy enable/disable, file persistence if needs to survive restart
+_FUND_ENABLED: dict[str, dict[str, bool]] = {}
+
 
 def register(name: str, meta: StrategyMeta, fn: callable):
     """Register a strategy function."""
@@ -57,6 +60,22 @@ def get_strategy(name: str) -> callable:
     if name not in _REGISTRY:
         raise KeyError(f"Strategy '{name}' not found")
     return _REGISTRY[name][1]
+
+
+def get_fund_enabled_strategies(fund_code: str) -> dict[str, bool]:
+    """Get enabled/disabled state for all strategies for a fund."""
+    if fund_code not in _FUND_ENABLED:
+        _FUND_ENABLED[fund_code] = {name: True for name, _ in _REGISTRY.items()}
+    return _FUND_ENABLED[fund_code]
+
+
+def toggle_fund_strategy(fund_code: str, strategy_name: str) -> bool:
+    """Toggle a strategy for a fund. Returns the new enabled state."""
+    if strategy_name not in _REGISTRY:
+        raise KeyError(f"Strategy '{strategy_name}' not found")
+    enabled_map = get_fund_enabled_strategies(fund_code)
+    enabled_map[strategy_name] = not enabled_map.get(strategy_name, True)
+    return enabled_map[strategy_name]
 
 
 def indicator_cross(price_df: pd.DataFrame, params: dict | None = None) -> list[Signal]:
