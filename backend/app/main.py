@@ -1,11 +1,14 @@
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 
 import xalpha as xa
 
-from app.models import AddFundRequest, Fund
+from app.data import load_fund_price
+from app.models import AddFundRequest, Fund, SignalResponse
+from app.strategies import get_strategy, list_strategies
 from app.watchlist import WatchlistService
 
 # API sub-app
@@ -59,6 +62,62 @@ async def remove_fund(code: str):
 @api.get("/funds/search")
 async def search_funds(q: str = ""):
     return watchlist.search(q)
+
+
+@api.get("/strategies")
+async def get_strategies():
+    """List all registered strategy plugins with metadata."""
+    return list_strategies()
+
+
+@api.get("/signals")
+async def get_signals(code: Optional[str] = Query(None)):
+    """Run all strategies against watchlist funds and return signals.
+
+    Returns flat list[SignalResponse] sorted by (date, fund_code).
+    Optional ?code= filter to target a single fund.
+    """
+    funds = watchlist.list_all()
+    if code:
+        funds = [f for f in funds if f.code == code]
+        if not funds:
+            return []
+
+    signals: list[SignalResponse] = []
+    strategies = list_strategies()
+
+    for fund in funds:
+        # ponytail: sequential fund processing, parallelize with asyncio if latency matters
+        price_df = load_fund_price(fund.code)
+
+        # Compute daily change from latest 2 NAV values
+        daily_change = 0.0
+        if len(price_df) >= 2:
+            sorted_price = price_df.sort_values("date")
+            daily_change = round(
+                (sorted_price.iloc[-1]["netvalue"] - sorted_price.iloc[-2]["netvalue"])
+                / sorted_price.iloc[-2]["netvalue"] * 100,
+                2,
+            )
+
+        for sm in strategies:
+            fn = get_strategy(sm.name)
+            # ponytail: strategy errors propagate per AC — no try/except here
+            result = fn(price_df)
+            for s in result:
+                s.fund_code = fund.code
+                signals.append(SignalResponse(
+                    date=s.date,
+                    fund_code=fund.code,
+                    fund_name=fund.name,
+                    strategy_name=s.strategy_name,
+                    signal_type=s.signal_type,
+                    confidence=s.confidence,
+                    daily_change=daily_change,
+                ))
+
+    signals.sort(key=lambda s: (s.date, s.fund_code))
+    return signals
 
 
 # Main app — mounts API and SPA

@@ -1,4 +1,4 @@
-import type { Fund } from "@/types";
+import type { Fund, SignalResponse, StrategyPlugin } from "@/types";
 
 const BASE = "/api";
 
@@ -32,4 +32,7 @@ export const api = {
   addFund: (code: string) => requestJSON<Fund>("/funds", { code }),
   removeFund: (code: string) => requestDel(`/funds/${code}`),
   searchFunds: (q: string) => request<Fund[]>(`/funds/search?q=${encodeURIComponent(q)}`),
+  getSignals: (code?: string) =>
+    request<SignalResponse[]>(`/signals${code ? `?code=${code}` : ""}`),
+  getStrategies: () => request<StrategyPlugin[]>("/strategies"),
 };
