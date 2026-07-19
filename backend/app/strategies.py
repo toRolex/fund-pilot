@@ -3,23 +3,53 @@
 Each strategy is a function: run(price_df, params=None) -> list[Signal]
 Registered in _REGISTRY dict by name.
 """
+import datetime
+
 import pandas as pd
 
-from app.models import Signal, SignalType, StrategyMeta
+from app.models import Signal, SignalType, StrategyLog, StrategyMeta
 
 
 # ponytail: global dict registry, plugin-based discovery if user-authored strategies needed
 _REGISTRY: dict[str, tuple[StrategyMeta, callable]] = {}
 
+# ponytail: in-memory ring buffer, DB-backed log if persistence needed
+_MAX_LOG = 200
+_logs: list[StrategyLog] = []
+
+
+def _add_log(message: str):
+    _logs.append(StrategyLog(
+        timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        message=message,
+    ))
+    if len(_logs) > _MAX_LOG:
+        _logs[:] = _logs[-_MAX_LOG:]
+
+
+def get_logs(limit: int = 50) -> list[StrategyLog]:
+    return _logs[-limit:]
+
 
 def register(name: str, meta: StrategyMeta, fn: callable):
     """Register a strategy function."""
     _REGISTRY[name] = (meta, fn)
+    _add_log(f"策略已注册: {name}")
 
 
 def list_strategies() -> list[StrategyMeta]:
     """Return metadata for all registered strategies."""
     return [meta for meta, _ in _REGISTRY.values()]
+
+
+def toggle_enabled(name: str, enabled: bool) -> StrategyMeta:
+    """Enable or disable a strategy. Raises KeyError if not found."""
+    if name not in _REGISTRY:
+        raise KeyError(f"Strategy '{name}' not found")
+    meta, fn = _REGISTRY[name]
+    meta.enabled = enabled
+    _add_log(f"策略 {'启用' if enabled else '禁用'}: {name}")
+    return meta
 
 
 def get_strategy(name: str) -> callable:
