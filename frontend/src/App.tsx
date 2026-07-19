@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NavBar } from "./components/NavBar";
+import { StatusBar } from "./components/StatusBar";
 import { Dashboard } from "./pages/Dashboard";
 import { Watchlists } from "./pages/Watchlists";
 import { Signals } from "./pages/Signals";
@@ -13,6 +14,7 @@ export function AppRoutes() {
   return (
     <div className="min-h-screen bg-root">
       <NavBar />
+      <StatusBar />
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/watchlists" element={<Watchlists />} />

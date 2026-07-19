@@ -36,4 +36,9 @@ describe("api client", () => {
     expect(api.getStrategies).toBeDefined();
     expect(typeof api.getStrategies).toBe("function");
   });
+
+  it("has getStatus", () => {
+    expect(api.getStatus).toBeDefined();
+    expect(typeof api.getStatus).toBe("function");
+  });
 });

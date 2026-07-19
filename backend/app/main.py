@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -7,7 +8,8 @@ from fastapi.staticfiles import StaticFiles
 import xalpha as xa
 
 from app.data import load_fund_price
-from app.models import AddFundRequest, Fund, SearchResult, SignalResponse, StrategyToggleRequest
+from app.models import AddFundRequest, Fund, SearchResult, SignalResponse, StrategyToggleRequest, SystemStatus
+from app.scheduler import get_cache, start as start_scheduler, stop as stop_scheduler
 from app.strategies import get_logs, get_strategy, list_strategies, toggle_enabled
 from app.watchlist import WatchlistService
 
@@ -113,6 +115,21 @@ async def get_strategy_logs(limit: int = 50):
     return get_logs(limit=limit)
 
 
+@api.get("/status")
+async def get_status():
+    """System status: last update, running strategies, watched funds, connection."""
+    cache = get_cache()
+    last_update = cache.get("last_update")
+    watchlist = WatchlistService()
+    return SystemStatus(
+        last_update=last_update.isoformat() if last_update else None,
+        strategies_running=len(list_strategies()),
+        funds_watched=len(watchlist.list_all()),
+        connected=True,
+    )
+>>>>>>> feature/14-refresh-statusbar
+
+
 @api.get("/signals")
 async def get_signals(code: Optional[str] = Query(None)):
     """Run all strategies against watchlist funds and return signals.
@@ -164,7 +181,13 @@ async def get_signals(code: Optional[str] = Query(None)):
 
 
 # Main app — mounts API and SPA
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+app = FastAPI(lifespan=lifespan)
 app.mount("/api", api)
 
 # SPA static files — frontend build output, fallback to index.html

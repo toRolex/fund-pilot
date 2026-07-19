@@ -53,3 +53,10 @@ class StrategyToggleRequest(BaseModel):
 class StrategyLog(BaseModel):
     timestamp: str
     message: str
+
+
+class SystemStatus(BaseModel):
+    last_update: str | None = None
+    strategies_running: int = 0
+    funds_watched: int = 0
+    connected: bool = True
