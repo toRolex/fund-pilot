@@ -1,4 +1,4 @@
-import type { Fund, SignalResponse, StrategyPlugin } from "@/types";
+import type { Fund, FundDetail, NavPoint, SignalResponse, StrategyPlugin, StrategyState } from "@/types";
 
 const BASE = "/api";
 
@@ -8,9 +8,9 @@ async function request<T>(path: string): Promise<T> {
   return res.json();
 }
 
-async function requestJSON<T>(path: string, body: unknown): Promise<T> {
+async function requestJSON<T>(path: string, body: unknown, method: string = "POST"): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -35,4 +35,13 @@ export const api = {
   getSignals: (code?: string) =>
     request<SignalResponse[]>(`/signals${code ? `?code=${code}` : ""}`),
   getStrategies: () => request<StrategyPlugin[]>("/strategies"),
+  getFundDetail: (code: string) => request<FundDetail>(`/funds/${code}`),
+  getFundSignals: (code: string) => request<SignalResponse[]>(`/funds/${code}/signals`),
+  getFundNav: (code: string) => request<NavPoint[]>(`/funds/${code}/nav`),
+  getFundStrategies: (code: string) => request<StrategyState[]>(`/funds/${code}/strategies`),
+  toggleFundStrategy: (code: string, strategy: string) =>
+    requestJSON<{ name: string; enabled: boolean }>(
+      `/funds/${code}/strategies/${strategy}`,
+      {},
+    ),
 };

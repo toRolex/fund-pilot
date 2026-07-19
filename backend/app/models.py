@@ -43,3 +43,24 @@ class StrategyMeta(BaseModel):
     name: str
     description: str
     params_schema: dict
+
+
+class FundDetail(Fund):
+    """Fund with enriched detail for the detail page."""
+    type: Optional[str] = None
+    scale: Optional[float] = None
+    established_date: Optional[str] = None
+    latest_nav: float = 0.0
+    latest_nav_date: Optional[str] = None
+    daily_change: float = 0.0
+
+
+class NavPoint(BaseModel):
+    date: str
+    netvalue: float
+
+
+class StrategyState(BaseModel):
+    name: str
+    description: str
+    enabled: bool = True
