@@ -1,13 +1,23 @@
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
 
 import xalpha as xa
 
 from app.data import load_fund_price
-from app.models import AddFundRequest, Fund, SearchResult, SignalResponse, StrategyToggleRequest
+from app.holdings import HoldingsService
+from app.models import (
+    AddFundRequest,
+    Fund,
+    Holding,
+    HoldingResponse,
+    SearchResult,
+    SignalResponse,
+    SignalType,
+    StrategyToggleRequest,
+)
 from app.strategies import get_logs, get_strategy, list_strategies, toggle_enabled
 from app.watchlist import WatchlistService
 
@@ -15,6 +25,7 @@ from app.watchlist import WatchlistService
 api = FastAPI(title="Fund Signal API")
 
 watchlist = WatchlistService()
+holdings_service = HoldingsService()
 
 
 @api.get("/health")
@@ -161,6 +172,102 @@ async def get_signals(code: Optional[str] = Query(None)):
 
     signals.sort(key=lambda s: (s.date, s.fund_code))
     return signals
+
+
+@api.get("/holdings")
+async def list_holdings():
+    """List current holdings with calculated P&L and signal enrichment."""
+    holdings = holdings_service.list_all()
+    if not holdings:
+        return []
+
+    # ponytail: sequential signal computation per fund, parallelize if latency matters
+    active_codes = _compute_holdings_signal_codes(holdings)
+
+    result = []
+    for h in holdings:
+        cost_basis = h.shares * h.cost_price
+        current_total = h.shares * h.current_value
+        pl_amount = current_total - cost_basis
+        pl_percent = (pl_amount / cost_basis * 100) if cost_basis > 0 else 0.0
+
+        result.append(HoldingResponse(
+            fund_code=h.fund_code,
+            fund_name=h.fund_name,
+            shares=h.shares,
+            cost_price=h.cost_price,
+            current_value=h.current_value,
+            cost_basis=round(cost_basis, 4),
+            pl_amount=round(pl_amount, 4),
+            pl_percent=round(pl_percent, 4),
+            has_signal=h.fund_code in active_codes,
+        ))
+
+    return result
+
+
+def _compute_holdings_signal_codes(holdings: list[Holding]) -> set[str]:
+    """Run strategies and return set of fund codes that have buy/sell signals."""
+    active: set[str] = set()
+    strategies = list_strategies()
+    if not strategies:
+        return active
+
+    for h in holdings:
+        try:
+            price_df = load_fund_price(h.fund_code)
+        except Exception:
+            continue
+
+        for sm in strategies:
+            fn = get_strategy(sm.name)
+            try:
+                signals = fn(price_df)
+            except Exception:
+                continue
+            for s in signals:
+                if s.signal_type in (SignalType.buy, SignalType.sell):
+                    active.add(h.fund_code)
+                    break
+            if h.fund_code in active:
+                break
+
+    return active
+
+
+@api.post("/holdings/import")
+async def import_holdings(request: Request):
+    """Import holdings from CSV file upload or JSON body."""
+    content_type = request.headers.get("content-type", "")
+
+    if "application/json" in content_type:
+        body = await request.json()
+        if isinstance(body, dict):
+            body = body.get("holdings", body)
+        if not isinstance(body, list):
+            raise HTTPException(status_code=422, detail="JSON body must be an array or {holdings: [...]}")
+        try:
+            holdings = [Holding(**item) for item in body]
+        except (ValueError, TypeError) as e:
+            raise HTTPException(status_code=422, detail=f"Invalid holding data: {e}")
+    elif "multipart/form-data" in content_type:
+        form = await request.form()
+        file = form.get("file")
+        if not file:
+            raise HTTPException(status_code=422, detail="CSV file required in 'file' field")
+        content = await file.read()
+        try:
+            holdings = HoldingsService.parse_csv(content.decode("utf-8"))
+        except (ValueError, KeyError) as e:
+            raise HTTPException(status_code=422, detail=f"Invalid CSV: {e}")
+    else:
+        raise HTTPException(status_code=422, detail="Unsupported content type, use application/json or multipart/form-data")
+
+    if not holdings:
+        raise HTTPException(status_code=422, detail="No holdings data provided")
+
+    holdings_service.import_holdings(holdings)
+    return {"imported": len(holdings)}
 
 
 # Main app — mounts API and SPA

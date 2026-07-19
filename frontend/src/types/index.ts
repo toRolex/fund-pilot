@@ -45,3 +45,18 @@ export interface StrategyLog {
   timestamp: string;
   message: string;
 }
+
+export interface Holding {
+  fund_code: string;
+  fund_name: string;
+  shares: number;
+  cost_price: number;
+  current_value: number;
+}
+
+export interface HoldingResponse extends Holding {
+  cost_basis: number;
+  pl_amount: number;
+  pl_percent: number;
+  has_signal: boolean;
+}

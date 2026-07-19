@@ -1,4 +1,4 @@
-import type { Fund, SignalResponse, StrategyLog, StrategyPlugin } from "@/types";
+import type { Fund, HoldingResponse, SignalResponse, StrategyLog, StrategyPlugin } from "@/types";
 
 const BASE = "/api";
 
@@ -48,4 +48,6 @@ export const api = {
   toggleStrategy: (name: string, enabled: boolean) =>
     requestPUT<StrategyPlugin>(`/strategies/${encodeURIComponent(name)}`, { enabled }),
   getStrategyLogs: () => request<StrategyLog[]>("/strategies/logs"),
+  getHoldings: () => request<HoldingResponse[]>("/holdings"),
+  importHoldings: (body: unknown) => requestJSON<{ imported: number }>("/holdings/import", body),
 };
