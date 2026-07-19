@@ -22,3 +22,6 @@ coverage/
 
 # macOS
 .DS_Store
+
+# Build artifacts
+*.egg-info/
