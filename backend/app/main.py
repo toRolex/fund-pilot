@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 import xalpha as xa
 
-from app.models import AddFundRequest, Fund
+from app.models import AddFundRequest, Fund, SearchResult
 from app.watchlist import WatchlistService
 
 # API sub-app
@@ -58,7 +58,35 @@ async def remove_fund(code: str):
 
 @api.get("/funds/search")
 async def search_funds(q: str = ""):
-    return watchlist.search(q)
+    if not q.strip():
+        return []
+    results: dict[str, SearchResult] = {}
+    watched_codes = {f.code for f in watchlist.list_all()}
+
+    # Try xalpha for exact code lookup
+    code = q.strip()
+    if code.isdigit():
+        try:
+            fi = xa.fundinfo(code)
+            name = getattr(fi, "name", "") or ""
+            results[code] = SearchResult(
+                code=code, name=name, is_watched=code in watched_codes
+            )
+        except Exception:
+            pass
+
+    # Search watchlist for partial matches (code + name)
+    for fund in watchlist.search(q):
+        if fund.code in results:
+            results[fund.code].is_watched = True
+        else:
+            results[fund.code] = SearchResult(
+                code=fund.code, name=fund.name, type=fund.type, is_watched=True
+            )
+
+    # ponytail: xalpha for exact code only; name-based all-fund search needs a
+    # broader source (e.g., fund list API) if watchlist-only is too narrow
+    return list(results.values())[:10]
 
 
 # Main app — mounts API and SPA

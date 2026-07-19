@@ -10,5 +10,9 @@ class Fund(BaseModel):
     type: Optional[str] = None
 
 
+class SearchResult(Fund):
+    is_watched: bool = False
+
+
 class AddFundRequest(BaseModel):
     code: str

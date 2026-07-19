@@ -20,6 +20,10 @@ export interface Watchlist {
   fund_codes: string[];
 }
 
+export interface SearchResult extends Fund {
+  is_watched: boolean;
+}
+
 export interface StrategyPlugin {
   name: string;
   description: string;
