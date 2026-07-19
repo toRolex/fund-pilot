@@ -26,4 +26,14 @@ describe("api client", () => {
     expect(api.searchFunds).toBeDefined();
     expect(typeof api.searchFunds).toBe("function");
   });
+
+  it("has getSignals", () => {
+    expect(api.getSignals).toBeDefined();
+    expect(typeof api.getSignals).toBe("function");
+  });
+
+  it("has getStrategies", () => {
+    expect(api.getStrategies).toBeDefined();
+    expect(typeof api.getStrategies).toBe("function");
+  });
 });

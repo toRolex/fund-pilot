@@ -14,6 +14,16 @@ export interface Signal {
   reason?: string;
 }
 
+export interface SignalResponse {
+  date: string;
+  fund_code: string;
+  fund_name: string;
+  strategy_name: string;
+  signal_type: SignalType;
+  confidence: number;
+  daily_change: number;
+}
+
 export interface Watchlist {
   id: string;
   name: string;
@@ -27,5 +37,5 @@ export interface SearchResult extends Fund {
 export interface StrategyPlugin {
   name: string;
   description: string;
-  params?: Record<string, unknown>;
+  params_schema: Record<string, unknown>;
 }

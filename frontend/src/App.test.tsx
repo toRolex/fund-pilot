@@ -18,7 +18,7 @@ function renderWithRouter(path: string) {
 describe("App", () => {
   it("renders dashboard on /", () => {
     renderWithRouter("/");
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("信号仪表盘")).toBeInTheDocument();
   });
 
   it("renders watchlists on /watchlists", () => {
