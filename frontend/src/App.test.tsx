@@ -23,7 +23,7 @@ describe("App", () => {
 
   it("renders watchlists on /watchlists", () => {
     renderWithRouter("/watchlists");
-    expect(screen.getByText("Watchlists")).toBeInTheDocument();
+    expect(screen.getByText("关注列表")).toBeInTheDocument();
   });
 
   it("renders signals on /signals", () => {

@@ -1,5 +1,11 @@
 export type SignalType = "buy" | "sell" | "hold";
 
+export interface Fund {
+  code: string;
+  name: string;
+  type?: string;
+}
+
 export interface Signal {
   fund_code: string;
   strategy: string;
