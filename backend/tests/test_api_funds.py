@@ -105,25 +105,69 @@ class TestRemoveFund:
 
 
 class TestSearchFunds:
-    def test_search_by_code(self, client):
+    @patch("app.main.xa")
+    def test_search_by_code_watched(self, mock_xa, client):
+        mock_fi = MagicMock()
+        mock_fi.name = "测试基金A"
+        mock_xa.fundinfo.return_value = mock_fi
+
         resp = client.get("/api/funds/search?q=000001")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1
         assert data[0]["code"] == "000001"
+        assert data[0]["is_watched"] is True
 
-    def test_search_by_name(self, client):
+    @patch("app.main.xa")
+    def test_search_by_code_not_watched(self, mock_xa, client):
+        mock_fi = MagicMock()
+        mock_fi.name = "新发现基金"
+        mock_xa.fundinfo.return_value = mock_fi
+
+        resp = client.get("/api/funds/search?q=999999")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["code"] == "999999"
+        assert data[0]["is_watched"] is False
+
+    @patch("app.main.xa")
+    def test_search_by_name(self, mock_xa, client):
         resp = client.get("/api/funds/search?q=测试基金A")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1
+        assert data[0]["is_watched"] is True
 
-    def test_search_no_results(self, client):
+    @patch("app.main.xa")
+    def test_search_no_results(self, mock_xa, client):
         resp = client.get("/api/funds/search?q=不存在")
         assert resp.status_code == 200
         assert resp.json() == []
 
-    def test_search_empty_query(self, client):
+    @patch("app.main.xa")
+    def test_search_empty_query(self, mock_xa, client):
         resp = client.get("/api/funds/search?q=")
         assert resp.status_code == 200
-        assert len(resp.json()) == 2
+        assert resp.json() == []
+
+    @patch("app.main.xa")
+    def test_search_partial_code(self, mock_xa, client):
+        """Partial numeric code falls back to watchlist search when xa raises."""
+        mock_xa.fundinfo.side_effect = Exception("invalid")
+        resp = client.get("/api/funds/search?q=000001")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["code"] == "000001"
+        assert data[0]["is_watched"] is True
+
+    @patch("app.main.xa")
+    def test_search_partial_name(self, mock_xa, client):
+        """Name partial match finds from watchlist."""
+        resp = client.get("/api/funds/search?q=基金A")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["code"] == "000001"
+        assert data[0]["is_watched"] is True
