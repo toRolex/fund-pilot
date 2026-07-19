@@ -38,6 +38,12 @@ export interface StrategyPlugin {
   name: string;
   description: string;
   params_schema: Record<string, unknown>;
+  enabled: boolean;
+}
+
+export interface StrategyLog {
+  timestamp: string;
+  message: string;
 }
 
 export interface Holding {

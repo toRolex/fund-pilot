@@ -1,4 +1,4 @@
-import type { Fund, HoldingResponse, SignalResponse, StrategyPlugin } from "@/types";
+import type { Fund, HoldingResponse, SignalResponse, StrategyLog, StrategyPlugin } from "@/types";
 
 const BASE = "/api";
 
@@ -11,6 +11,16 @@ async function request<T>(path: string): Promise<T> {
 async function requestJSON<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+async function requestPUT<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -35,6 +45,9 @@ export const api = {
   getSignals: (code?: string) =>
     request<SignalResponse[]>(`/signals${code ? `?code=${code}` : ""}`),
   getStrategies: () => request<StrategyPlugin[]>("/strategies"),
+  toggleStrategy: (name: string, enabled: boolean) =>
+    requestPUT<StrategyPlugin>(`/strategies/${encodeURIComponent(name)}`, { enabled }),
+  getStrategyLogs: () => request<StrategyLog[]>("/strategies/logs"),
   getHoldings: () => request<HoldingResponse[]>("/holdings"),
   importHoldings: (body: unknown) => requestJSON<{ imported: number }>("/holdings/import", body),
 };

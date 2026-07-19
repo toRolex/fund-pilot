@@ -16,8 +16,9 @@ from app.models import (
     SearchResult,
     SignalResponse,
     SignalType,
+    StrategyToggleRequest,
 )
-from app.strategies import get_strategy, list_strategies
+from app.strategies import get_logs, get_strategy, list_strategies, toggle_enabled
 from app.watchlist import WatchlistService
 
 # API sub-app
@@ -106,6 +107,21 @@ async def search_funds(q: str = ""):
 async def get_strategies():
     """List all registered strategy plugins with metadata."""
     return list_strategies()
+
+
+@api.put("/strategies/{name}")
+async def update_strategy(name: str, body: StrategyToggleRequest):
+    """Enable or disable a strategy."""
+    try:
+        return toggle_enabled(name, body.enabled)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@api.get("/strategies/logs")
+async def get_strategy_logs(limit: int = 50):
+    """Get recent strategy engine log entries."""
+    return get_logs(limit=limit)
 
 
 @api.get("/signals")

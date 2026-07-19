@@ -43,6 +43,16 @@ class StrategyMeta(BaseModel):
     name: str
     description: str
     params_schema: dict
+    enabled: bool = True
+
+
+class StrategyToggleRequest(BaseModel):
+    enabled: bool
+
+
+class StrategyLog(BaseModel):
+    timestamp: str
+    message: str
 
 
 class Holding(BaseModel):

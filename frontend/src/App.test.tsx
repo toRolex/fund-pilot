@@ -38,7 +38,7 @@ describe("App", () => {
 
   it("renders strategies on /strategies", () => {
     renderWithRouter("/strategies");
-    expect(screen.getByText("Strategies")).toBeInTheDocument();
+    expect(screen.getByText("策略管理")).toBeInTheDocument();
   });
 
   it("renders 404 on unknown path", () => {
