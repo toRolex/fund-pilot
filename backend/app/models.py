@@ -43,3 +43,10 @@ class StrategyMeta(BaseModel):
     name: str
     description: str
     params_schema: dict
+
+
+class SystemStatus(BaseModel):
+    last_update: str | None = None
+    strategies_running: int = 0
+    funds_watched: int = 0
+    connected: bool = True

@@ -39,3 +39,10 @@ export interface StrategyPlugin {
   description: string;
   params_schema: Record<string, unknown>;
 }
+
+export interface SystemStatus {
+  last_update: string | null;
+  strategies_running: number;
+  funds_watched: number;
+  connected: boolean;
+}
