@@ -43,3 +43,18 @@ class StrategyMeta(BaseModel):
     name: str
     description: str
     params_schema: dict
+
+
+class Holding(BaseModel):
+    fund_code: str
+    fund_name: str
+    shares: float
+    cost_price: float
+    current_value: float
+
+
+class HoldingResponse(Holding):
+    cost_basis: float = 0.0
+    pl_amount: float = 0.0
+    pl_percent: float = 0.0
+    has_signal: bool = False

@@ -21,6 +21,11 @@ describe("App", () => {
     expect(screen.getByText("信号仪表盘")).toBeInTheDocument();
   });
 
+  it("renders holdings on /holdings", () => {
+    renderWithRouter("/holdings");
+    expect(screen.getByText("持仓")).toBeInTheDocument();
+  });
+
   it("renders watchlists on /watchlists", () => {
     renderWithRouter("/watchlists");
     expect(screen.getByText("关注列表")).toBeInTheDocument();
