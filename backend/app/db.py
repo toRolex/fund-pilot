@@ -84,6 +84,8 @@ def save_signal_item(
 def query_signals(
     conn: sqlite3.Connection,
     fund_code: str | None = None,
+    run_id: int | None = None,
+    strategy: str | None = None,
 ) -> list[dict]:
     sql = """
         SELECT si.fund_code, si.signal, si.value, si.detail, si.date,
@@ -91,9 +93,21 @@ def query_signals(
         FROM signal_item si
         JOIN signal_run sr ON si.run_id = sr.id
     """
-    params: list[str] = []
+    conditions: list[str] = []
+    params: list[str | int] = []
     if fund_code:
-        sql += " WHERE si.fund_code = ?"
+        conditions.append("si.fund_code = ?")
         params.append(fund_code)
+    if run_id is not None:
+        conditions.append("si.run_id = ?")
+        params.append(run_id)
+    if strategy:
+        conditions.append("sr.strategy = ?")
+        params.append(strategy)
+    if not run_id:
+        # Default: latest run only
+        conditions.append("si.run_id = (SELECT MAX(id) FROM signal_run)")
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
     sql += " ORDER BY si.id"
     return [dict(r) for r in conn.execute(sql, params).fetchall()]

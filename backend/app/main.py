@@ -177,15 +177,19 @@ async def get_status():
 
 
 @api.get("/signals")
-async def get_signals(fund_code: Optional[str] = Query(None)):
+async def get_signals(
+    fund_code: Optional[str] = Query(None),
+    run_id: Optional[int] = Query(None),
+    strategy: Optional[str] = Query(None),
+):
     """Read signals from SQLite, enriched with fund name and daily change.
 
-    Optional ?fund_code= filter to target a single fund.
-    Returns flat list[SignalResponse] sorted by (date, fund_code).
+    Optional filters: ?fund_code=, ?run_id=, ?strategy=
+    Default: returns only the latest run's signals.
     """
     conn = get_db_connection()
     init_db(conn)
-    rows = query_signals(conn, fund_code=fund_code)
+    rows = query_signals(conn, fund_code=fund_code, run_id=run_id, strategy=strategy)
     conn.close()
 
     if not rows:
