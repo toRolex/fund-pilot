@@ -1,13 +1,11 @@
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
-import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  ReferenceDot, CartesianGrid,
-} from "recharts";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { SignalBadge } from "./SignalBadge";
-import type { NavPoint, SignalResponse, SignalType } from "@/types";
+import { ConfidenceBar } from "@/components/ConfidenceBar";
+import type { NavPoint, SignalResponse, SignalType, FundDetail as FundDetailType } from "@/types";
+import { useMemo } from "react";
 
 function useFundDetail(code: string) {
   return useQuery({
@@ -45,28 +43,15 @@ function LoadingSkeleton() {
   return (
     <div className="animate-pulse space-y-4 p-6">
       <div className="h-8 w-48 rounded bg-white/5" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="flex gap-3 flex-wrap">
         {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="h-20 rounded-lg bg-white/5 border border-white/5" />
+          <div key={i} className="h-16 min-w-[130px] flex-1 rounded-lg bg-white/5 border border-white/5" />
         ))}
       </div>
       <div className="h-72 rounded-lg bg-white/5 border border-white/5" />
       <div className="h-48 rounded-lg bg-white/5 border border-white/5" />
     </div>
   );
-}
-
-function formatNavDate(dateStr: string): string {
-  // Show MM-DD for compact x-axis labels
-  return dateStr.slice(5);
-}
-
-function computeRangeChange(points: NavPoint[]): { first: number; last: number; pct: number } {
-  if (points.length < 2) return { first: 0, last: 0, pct: 0 };
-  const first = points[0].netvalue;
-  const last = points[points.length - 1].netvalue;
-  const pct = first !== 0 ? round(((last - first) / first) * 100, 2) : 0;
-  return { first, last, pct };
 }
 
 function round(v: number, decimals: number): number {
@@ -80,107 +65,166 @@ const SIGNAL_COLORS: Record<SignalType, string> = {
   hold: "#facc15",
 };
 
-interface SignalMarker {
-  date: string;
-  netvalue: number;
-  signal_type: SignalType;
-  strategy_name: string;
+// ── SVG Chart ──────────────────────────────────────────────────────────────
+const CHART_W = 700;
+const CHART_H = 280;
+const PAD_L = 52;
+const PAD_R = 14;
+const PAD_T = 18;
+const PAD_B = 26;
+
+function fmtTick(v: number): string {
+  if (Math.abs(v) >= 100) return v.toFixed(1);
+  if (Math.abs(v) >= 10) return v.toFixed(2);
+  if (Math.abs(v) >= 1) return v.toFixed(3);
+  return v.toFixed(4);
 }
 
-function buildSignalMarkers(nav: NavPoint[], signals: SignalResponse[]): SignalMarker[] {
-  const navMap = new Map<string, number>();
-  for (const p of nav) navMap.set(p.date, p.netvalue);
+interface ChartLayout {
+  linePts: string;
+  areaPts: string;
+  yTicks: { v: number; y: number }[];
+  xLabels: { label: string; x: number }[];
+  markers: { x: number; y: number; type: SignalType }[];
+  firstVal: number;
+  lastVal: number;
+  firstDate: string;
+  lastDate: string;
+}
 
-  const markers: SignalMarker[] = [];
+function computeChartLayout(nav: NavPoint[], signals: SignalResponse[]): ChartLayout | null {
+  if (nav.length === 0) return null;
+
+  const vals = nav.map((p) => p.netvalue);
+  const dMin = Math.min(...vals);
+  const dMax = Math.max(...vals);
+  const dRng = dMax - dMin || 1;
+  const pad = dRng * 0.1;
+  const yMin = dMin - pad;
+  const yMax = dMax + pad;
+  const yRng = yMax - yMin;
+
+  const cw = CHART_W - PAD_L - PAD_R;
+  const ch = CHART_H - PAD_T - PAD_B;
+  const n = nav.length;
+
+  const x = (i: number) => PAD_L + (n > 1 ? (i / (n - 1)) * cw : cw / 2);
+  const y = (v: number) => PAD_T + ch - ((v - yMin) / yRng) * ch;
+
+  const linePts = nav.map((p, i) => `${x(i)},${y(p.netvalue)}`).join(" ");
+  const areaPts = `${x(0)},${PAD_T + ch} ${linePts} ${x(n - 1)},${PAD_T + ch}`;
+
+  const yTicks = Array.from({ length: 6 }, (_, i) => ({
+    v: yMin + yRng * (1 - i / 5),
+    y: PAD_T + (ch * i) / 5,
+  }));
+
+  const maxLabels = Math.min(8, n);
+  const step = Math.max(1, Math.floor((n - 1) / Math.max(1, maxLabels - 1)));
+  const xLabels: { label: string; x: number }[] = [];
+  for (let i = 0; i < n; i += step) {
+    xLabels.push({ label: nav[i].date.slice(5), x: x(i) });
+  }
+  if (xLabels.length > 0 && xLabels[xLabels.length - 1].x < x(n - 1) - 10) {
+    xLabels.push({ label: nav[n - 1].date.slice(5), x: x(n - 1) });
+  }
+
+  const navMap = new Map(nav.map((p, i) => [p.date, i]));
+  const markers: { x: number; y: number; type: SignalType }[] = [];
   for (const s of signals) {
-    const netvalue = navMap.get(s.date);
-    if (netvalue != null) {
-      markers.push({ date: s.date, netvalue, signal_type: s.signal_type, strategy_name: s.strategy_name });
+    const idx = navMap.get(s.date);
+    if (idx != null) {
+      markers.push({ x: x(idx), y: y(nav[idx].netvalue), type: s.signal_type });
     }
   }
-  return markers;
+
+  return { linePts, areaPts, yTicks, xLabels, markers, firstVal: vals[0], lastVal: vals[vals.length - 1], firstDate: nav[0].date, lastDate: nav[n - 1].date };
+}
+
+function renderSignalMarker(x: number, y: number, type: SignalType, key: number) {
+  switch (type) {
+    case "buy":
+      return (
+        <g key={key}>
+          <circle cx={x} cy={y} r={5} fill="none" stroke="var(--signal-buy)" strokeWidth={1.5} />
+          <circle cx={x} cy={y} r={2.5} fill="var(--signal-buy)" />
+        </g>
+      );
+    case "sell":
+      return <polygon key={key} points={`${x},${y - 8} ${x - 5},${y} ${x + 5},${y}`} fill="var(--signal-sell)" />;
+    case "hold":
+      return <rect key={key} x={x - 3} y={y - 3} width={6} height={6} fill="var(--signal-hold)" />;
+  }
 }
 
 function NavChart({ nav, signals }: { nav: NavPoint[]; signals: SignalResponse[] }) {
-  const markers = buildSignalMarkers(nav, signals);
-  const range = computeRangeChange(nav);
-  const rangeColor = range.pct >= 0 ? "text-emerald-400" : "text-orange-400";
+  const layout = useMemo(() => computeChartLayout(nav, signals), [nav, signals]);
+
+  if (!layout) {
+    return (
+      <div style={{ border: "1px solid var(--border)", background: "var(--surface)", padding: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        <div className="chart-title">净值走势（含信号标记）</div>
+        <div className="flex items-center justify-center" style={{ height: 260, fontSize: "var(--fs-tiny)", color: "var(--muted)" }}>
+          暂无净值数据
+        </div>
+      </div>
+    );
+  }
+
+  const rangePct = layout.firstVal !== 0 ? round(((layout.lastVal - layout.firstVal) / layout.firstVal) * 100, 2) : 0;
+  const rangeColor = rangePct >= 0 ? "#26c99e" : "#e8844a";
 
   return (
-    <div className="rounded-lg bg-[#16161E] border border-white/5 p-4">
-      <h2 className="mb-4 text-sm font-semibold text-white">净值走势</h2>
-      <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={nav} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-          <XAxis
-            dataKey="date"
-            tickFormatter={formatNavDate}
-            stroke="rgba(255,255,255,0.2)"
-            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
-            interval="preserveStartEnd"
-          />
-          <YAxis
-            domain={["auto", "auto"]}
-            stroke="rgba(255,255,255,0.2)"
-            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
-            width={60}
-          />
-          <Tooltip
-            contentStyle={{
-              background: "#1a1a2e",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "8px",
-              fontSize: "12px",
-            }}
-            labelFormatter={(d: string) => d}
-          />
-          <Line
-            type="monotone"
-            dataKey="netvalue"
-            stroke="#818cf8"
-            strokeWidth={1.5}
-            dot={false}
-            activeDot={{ r: 3, fill: "#818cf8" }}
-          />
-          {markers.map((m, i) => (
-            <ReferenceDot
-              key={`${m.date}-${i}`}
-              x={m.date}
-              y={m.netvalue}
-              r={5}
-              fill={SIGNAL_COLORS[m.signal_type]}
-              stroke="none"
-            />
+    <div style={{ border: "1px solid var(--border)", background: "var(--surface)", padding: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+      <div className="chart-title">净值走势（含信号标记）</div>
+      <div className="chart-wrap">
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} role="img" aria-label="净值走势图">
+          <defs>
+            <linearGradient id="nav-area-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.15} />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          {layout.yTicks.map((t, i) => (
+            <g key={`yt-${i}`}>
+              <line x1={PAD_L} y1={t.y} x2={CHART_W - PAD_R} y2={t.y} stroke="var(--border)" strokeWidth={0.5} />
+              <text x={PAD_L - 6} y={t.y + 4} textAnchor="end" fill="var(--muted)" fontSize="10" fontFamily="JetBrains Mono, monospace">
+                {fmtTick(t.v)}
+              </text>
+            </g>
           ))}
-        </LineChart>
-      </ResponsiveContainer>
-
-      {/* Legend */}
-      <div className="mt-3 flex items-center gap-4 text-xs text-gray-400">
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400" /> 买入
+          {layout.xLabels.map((l, i) => (
+            <text key={`xl-${i}`} x={l.x} y={CHART_H - 6} textAnchor="middle" fill="var(--muted)" fontSize="10" fontFamily="JetBrains Mono, monospace">
+              {l.label}
+            </text>
+          ))}
+          <polyline fill="url(#nav-area-grad)" stroke="none" points={layout.areaPts} />
+          <polyline fill="none" stroke="var(--accent)" strokeWidth={1.5} points={layout.linePts} />
+          {layout.markers.map((m, i) => renderSignalMarker(m.x, m.y, m.type, i))}
+        </svg>
+      </div>
+      <div className="chart-legend">
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ width: 8, height: 8, background: "var(--signal-buy)", display: "inline-block" }} /> 买入
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-400" /> 卖出
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ display: "inline-block", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "8px solid var(--signal-sell)" }} /> 卖出
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-yellow-400" /> 持有
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--signal-hold)", display: "inline-block" }} /> 持有
         </span>
       </div>
-
-      {/* Footer info */}
-      {nav.length > 0 && (
-        <div className="mt-3 flex items-center gap-3 border-t border-white/5 pt-3 text-xs text-gray-500">
-          <span>{nav[0].date} ~ {nav[nav.length - 1].date}</span>
-          <span className={rangeColor}>
-            区间涨跌: {range.pct > 0 ? "+" : ""}{range.pct}%
-          </span>
-        </div>
-      )}
+      <div className="chart-footer">
+        <span>{layout.firstDate} ~ {layout.lastDate}</span>
+        <span style={{ color: rangeColor }}>
+          区间涨跌: {rangePct > 0 ? "+" : ""}{rangePct}%
+        </span>
+      </div>
     </div>
   );
 }
 
+// ── Signal Table ───────────────────────────────────────────────────────────
 function SignalTable({ signals }: { signals: SignalResponse[] }) {
   if (signals.length === 0) {
     return (
@@ -195,11 +239,11 @@ function SignalTable({ signals }: { signals: SignalResponse[] }) {
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-white/5">
-            <th className="p-3 text-xs font-medium text-gray-400">日期</th>
+            <th className="p-3 text-xs font-medium text-gray-400">日期时间</th>
             <th className="p-3 text-xs font-medium text-gray-400">策略</th>
             <th className="p-3 text-xs font-medium text-gray-400">信号</th>
-            <th className="p-3 text-xs font-medium text-gray-400">置信度</th>
-            <th className="p-3 text-xs font-medium text-gray-400">策略详情</th>
+            <th className="p-3 text-xs font-medium text-gray-400 text-right">置信度</th>
+            <th className="p-3 text-xs font-medium text-gray-400">详情</th>
           </tr>
         </thead>
         <tbody>
@@ -210,20 +254,10 @@ function SignalTable({ signals }: { signals: SignalResponse[] }) {
               <td className="p-3">
                 <SignalBadge type={s.signal_type} confidence={s.confidence} strategy={s.strategy_name} />
               </td>
-              <td className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-16 rounded-full bg-white/10">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        s.confidence >= 0.7 ? "bg-emerald-400" : s.confidence >= 0.4 ? "bg-yellow-400" : "bg-gray-400"
-                      }`}
-                      style={{ width: `${Math.round(s.confidence * 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-400">{Math.round(s.confidence * 100)}%</span>
-                </div>
+              <td className="p-3 text-right">
+                <ConfidenceBar value={s.confidence} />
               </td>
-              <td className="p-3 text-gray-400 text-xs">{s.strategy_name}</td>
+              <td className="p-3 text-gray-400 text-xs">{s.daily_change ? `${s.daily_change > 0 ? "+" : ""}${s.daily_change}%` : "-"}</td>
             </tr>
           ))}
         </tbody>
@@ -232,6 +266,7 @@ function SignalTable({ signals }: { signals: SignalResponse[] }) {
   );
 }
 
+// ── Strategy Sidebar (CSS toggle) ────────────────────────────────────────────
 function StrategiesSidebar({ code }: { code: string }) {
   const queryClient = useQueryClient();
   const { data: strategies, isLoading } = useFundStrategies(code);
@@ -256,25 +291,26 @@ function StrategiesSidebar({ code }: { code: string }) {
 
   return (
     <div className="rounded-lg bg-[#16161E] border border-white/5 p-4">
-      <h2 className="mb-4 text-sm font-semibold text-white">运行策略</h2>
+      <div className="text-xs text-gray-400 mb-4 tracking-wider">运行策略</div>
       {(!strategies || strategies.length === 0) ? (
         <p className="text-xs text-gray-500">暂无策略</p>
       ) : (
-        <div className="space-y-3">
+        <div>
           {strategies.map((s) => (
-            <div key={s.name} className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-white truncate">{s.name}</p>
-                <p className="text-xs text-gray-500 truncate">{s.description}</p>
+            <div key={s.name} style={{ padding: "var(--space-3) 0", borderBottom: "1px solid var(--border)" }}>
+              <div className="text-sm font-medium text-white mb-1">{s.name}</div>
+              <div className="text-xs text-gray-400 mb-2">{s.description}</div>
+              <div className="toggle-wrap">
+                <div
+                  className={`toggle${s.enabled ? " active" : ""}`}
+                  onClick={() => toggleMutation.mutate(s.name)}
+                  role="switch"
+                  aria-checked={s.enabled}
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleMutation.mutate(s.name); } }}
+                />
+                <span className="toggle-label">{s.enabled ? "已启用" : "已禁用"}</span>
               </div>
-              <button
-                onClick={() => toggleMutation.mutate(s.name)}
-                disabled={toggleMutation.isPending}
-                className="shrink-0 ml-2 text-gray-400 hover:text-white transition-colors"
-                title={s.enabled ? "禁用" : "启用"}
-              >
-                {s.enabled ? <ToggleRight className="h-5 w-5 text-emerald-400" /> : <ToggleLeft className="h-5 w-5" />}
-              </button>
             </div>
           ))}
         </div>
@@ -283,6 +319,7 @@ function StrategiesSidebar({ code }: { code: string }) {
   );
 }
 
+// ── Fund Detail Page ────────────────────────────────────────────────────────
 export function FundDetail() {
   const { code } = useParams<{ code: string }>();
   const { data: fund, isLoading, isError, error, refetch } = useFundDetail(code ?? "");
@@ -317,12 +354,6 @@ export function FundDetail() {
 
   if (!fund) return null;
 
-  const changeColor = fund.daily_change > 0
-    ? "text-red-400"
-    : fund.daily_change < 0
-      ? "text-green-400"
-      : "text-gray-400";
-
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Back link */}
@@ -330,45 +361,47 @@ export function FundDetail() {
         <ArrowLeft className="h-4 w-4" /> 返回仪表盘
       </a>
 
-      {/* Fund meta info bar */}
-      <div className="mb-6 rounded-lg bg-[#16161E] border border-white/5 p-4">
-        <div className="flex items-baseline gap-3 mb-4">
-          <h1 className="text-xl font-bold text-white">{fund.name}</h1>
-          <span className="font-mono text-xs text-gray-500">{fund.code}</span>
-          {fund.type && <span className="rounded bg-white/5 px-2 py-0.5 text-xs text-gray-400">{fund.type}</span>}
+      {/* Meta info bar – prototype style */}
+      <div className="meta-bar">
+        <div className="meta-item">
+          <span className="meta-label">基金名称</span>
+          <span className="meta-value">{fund.name}</span>
         </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          <MetaItem label="最新净值" value={fund.latest_nav.toFixed(4)} />
-          <MetaItem label="日涨跌" value={`${fund.daily_change > 0 ? "+" : ""}${fund.daily_change}%`} className={changeColor} />
-          <MetaItem label="净值日期" value={fund.latest_nav_date ?? "-"} />
-          <MetaItem label="规模" value={fund.scale != null ? `${fund.scale}亿` : "-"} />
-          <MetaItem label="成立日期" value={fund.established_date ?? "-"} />
-          <MetaItem label="基金类型" value={fund.type || "-"} />
+        <div className="meta-item">
+          <span className="meta-label">代码</span>
+          <span className="meta-value" style={{ color: "var(--accent)" }}>{fund.code}</span>
+        </div>
+        <div className="meta-item">
+          <span className="meta-label">类型</span>
+          <span className="meta-value">{fund.type || "-"}</span>
+        </div>
+        <div className="meta-item">
+          <span className="meta-label">规模</span>
+          <span className="meta-value">{fund.scale != null ? `${fund.scale}亿` : "-"}</span>
+        </div>
+        <div className="meta-item">
+          <span className="meta-label">成立日期</span>
+          <span className="meta-value">{fund.established_date ?? "-"}</span>
+        </div>
+        <div className="meta-item">
+          <span className="meta-label">最新净值</span>
+          <span className="meta-value">{fund.latest_nav.toFixed(4)}</span>
         </div>
       </div>
 
-      {/* Main content area: chart + table | sidebar */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-        <div className="lg:col-span-3 space-y-6">
+      {/* Main content area */}
+      <div className="content-grid">
+        <div className="main-col">
           <NavChart nav={nav ?? []} signals={signals ?? []} />
           <div>
             <h2 className="mb-3 text-sm font-semibold text-white">历史信号</h2>
             <SignalTable signals={signals ?? []} />
           </div>
         </div>
-        <div className="lg:col-span-1">
+        <div>
           <StrategiesSidebar code={code ?? ""} />
         </div>
       </div>
-    </div>
-  );
-}
-
-function MetaItem({ label, value, className }: { label: string; value: string; className?: string }) {
-  return (
-    <div>
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
-      <p className={`text-sm font-medium text-white ${className ?? ""}`}>{value}</p>
     </div>
   );
 }
