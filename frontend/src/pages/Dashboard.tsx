@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { SignalBadge } from "./SignalBadge";
-import { ConfidenceBar } from "../components/ConfidenceBar";
+import { ConfidenceBar } from "@/components/ConfidenceBar";
+import { ErrorState } from "@/components/ErrorState";
+import { EmptyState } from "@/components/EmptyState";
+import { TableSkeleton } from "@/components/TableSkeleton";
 
 type SortKey = "fund_code" | "fund_name" | "signal_type" | "confidence" | "daily_change";
 
@@ -24,20 +27,7 @@ export function Dashboard() {
     return (
       <div className="p-6">
         <h1 className="page-heading">信号仪表盘</h1>
-        <div className="skel" style={{ width: 180, height: 22, marginBottom: 16 }} />
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div
-            key={i}
-            className="flex gap-3 py-2 border-b border-[var(--border)]"
-          >
-            <div className="skel flex-[2]" />
-            <div className="skel flex-1" />
-            <div className="skel flex-1" />
-            <div className="skel flex-[1.5]" />
-            <div className="skel flex-1" />
-            <div className="skel" style={{ width: 80 }} />
-          </div>
-        ))}
+        <TableSkeleton />
       </div>
     );
   }
@@ -46,16 +36,7 @@ export function Dashboard() {
     return (
       <div className="p-6">
         <h1 className="page-heading">信号仪表盘</h1>
-        <div className="error-state visible">
-          <div className="error-icon">&#9650;</div>
-          <div className="error-title">数据加载失败</div>
-          <div className="error-desc">
-            无法连接后台服务，请检查后端状态后重试。
-          </div>
-          <button className="btn btn-primary" onClick={() => refetch()}>
-            重试
-          </button>
-        </div>
+        <ErrorState onRetry={() => refetch()} />
       </div>
     );
   }
@@ -127,13 +108,11 @@ export function Dashboard() {
       </div>
 
       {!hasSignals ? (
-        <div className="empty-state visible">
-          <div className="empty-icon">&#9670;</div>
-          <div className="empty-title">暂无信号数据</div>
-          <div className="empty-desc">
-            策略正在运行，尚未生成信号。请等待策略完成首次分析。
-          </div>
-        </div>
+        <EmptyState
+          icon={"◆"}
+          title="暂无信号数据"
+          description="策略正在运行，尚未生成信号。请等待策略完成首次分析。"
+        />
       ) : (
         <div className="table-wrap">
           <table>

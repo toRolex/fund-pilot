@@ -1,9 +1,10 @@
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api";
-import { SignalBadge } from "./SignalBadge";
+import { SignalBadge, SignalBuyMarker, SignalSellMarker, SignalHoldMarker } from "./SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
+import { ErrorState } from "@/components/ErrorState";
 import type { NavPoint, SignalResponse, SignalType, FundDetail as FundDetailType } from "@/types";
 import { useMemo } from "react";
 
@@ -141,22 +142,6 @@ function computeChartLayout(nav: NavPoint[], signals: SignalResponse[]): ChartLa
   return { linePts, areaPts, yTicks, xLabels, markers, firstVal: vals[0], lastVal: vals[vals.length - 1], firstDate: nav[0].date, lastDate: nav[n - 1].date };
 }
 
-function renderSignalMarker(x: number, y: number, type: SignalType, key: number) {
-  switch (type) {
-    case "buy":
-      return (
-        <g key={key}>
-          <circle cx={x} cy={y} r={5} fill="none" stroke="var(--signal-buy)" strokeWidth={1.5} />
-          <circle cx={x} cy={y} r={2.5} fill="var(--signal-buy)" />
-        </g>
-      );
-    case "sell":
-      return <polygon key={key} points={`${x},${y - 8} ${x - 5},${y} ${x + 5},${y}`} fill="var(--signal-sell)" />;
-    case "hold":
-      return <rect key={key} x={x - 3} y={y - 3} width={6} height={6} fill="var(--signal-hold)" />;
-  }
-}
-
 function NavChart({ nav, signals }: { nav: NavPoint[]; signals: SignalResponse[] }) {
   const layout = useMemo(() => computeChartLayout(nav, signals), [nav, signals]);
 
@@ -200,7 +185,13 @@ function NavChart({ nav, signals }: { nav: NavPoint[]; signals: SignalResponse[]
           ))}
           <polyline fill="url(#nav-area-grad)" stroke="none" points={layout.areaPts} />
           <polyline fill="none" stroke="var(--accent)" strokeWidth={1.5} points={layout.linePts} />
-          {layout.markers.map((m, i) => renderSignalMarker(m.x, m.y, m.type, i))}
+          {layout.markers.map((m, i) => {
+            switch (m.type) {
+              case "buy": return <SignalBuyMarker key={i} cx={m.x} cy={m.y} />;
+              case "sell": return <SignalSellMarker key={i} cx={m.x} cy={m.y} />;
+              case "hold": return <SignalHoldMarker key={i} cx={m.x} cy={m.y} />;
+            }
+          })}
         </svg>
       </div>
       <div className="chart-legend">
@@ -335,19 +326,10 @@ export function FundDetail() {
         <a href="/" className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-white mb-6 transition-colors">
           <ArrowLeft className="h-4 w-4" /> 返回仪表盘
         </a>
-        <div className="flex flex-col items-center gap-4 bg-[#16161E] border border-white/5 p-12">
-          <p className="text-gray-400">
-            {is404 ? `基金 ${code} 不存在` : "加载失败，请重试"}
-          </p>
-          {!is404 && (
-            <button
-              onClick={() => refetch()}
-              className="inline-flex items-center gap-2 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 transition-colors"
-            >
-              <RefreshCw className="h-4 w-4" /> 重试
-            </button>
-          )}
-        </div>
+        <ErrorState
+          message={is404 ? `基金 ${code} 不存在` : "加载失败，请重试"}
+          onRetry={is404 ? undefined : () => refetch()}
+        />
       </div>
     );
   }
