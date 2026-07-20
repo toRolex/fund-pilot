@@ -14,7 +14,7 @@ export function StatusBar() {
     <div className="flex items-center justify-between px-4 py-1 text-xs text-gray-400 bg-surface border-b border-gray-800">
       <div className="flex items-center gap-2">
         <span
-          className={`w-2 h-2 rounded-full ${connected ? "bg-green-400" : "bg-gray-500"}`}
+          className={`w-2 h-2 ${connected ? "bg-green-400" : "bg-gray-500"}`}
         />
         <span>{connected ? "运行中" : "离线"}</span>
       </div>

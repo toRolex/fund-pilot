@@ -42,14 +42,14 @@ function useFundStrategies(code: string) {
 function LoadingSkeleton() {
   return (
     <div className="animate-pulse space-y-4 p-6">
-      <div className="h-8 w-48 rounded bg-white/5" />
+      <div className="h-8 w-48 bg-white/5" />
       <div className="flex gap-3 flex-wrap">
         {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="h-16 min-w-[130px] flex-1 rounded-lg bg-white/5 border border-white/5" />
+          <div key={i} className="h-16 min-w-[130px] flex-1 bg-white/5 border border-white/5" />
         ))}
       </div>
-      <div className="h-72 rounded-lg bg-white/5 border border-white/5" />
-      <div className="h-48 rounded-lg bg-white/5 border border-white/5" />
+      <div className="h-72 bg-white/5 border border-white/5" />
+      <div className="h-48 bg-white/5 border border-white/5" />
     </div>
   );
 }
@@ -211,7 +211,7 @@ function NavChart({ nav, signals }: { nav: NavPoint[]; signals: SignalResponse[]
           <span style={{ display: "inline-block", width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "8px solid var(--signal-sell)" }} /> 卖出
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--signal-hold)", display: "inline-block" }} /> 持有
+          <span style={{ width: 8, height: 8, background: "var(--signal-hold)", display: "inline-block" }} /> 持有
         </span>
       </div>
       <div className="chart-footer">
@@ -228,14 +228,14 @@ function NavChart({ nav, signals }: { nav: NavPoint[]; signals: SignalResponse[]
 function SignalTable({ signals }: { signals: SignalResponse[] }) {
   if (signals.length === 0) {
     return (
-      <div className="rounded-lg bg-[#16161E] border border-white/5 p-8 text-center text-sm text-gray-500">
+      <div className=" bg-[#16161E] border border-white/5 p-8 text-center text-sm text-gray-500">
         暂无历史信号
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg bg-[#16161E] border border-white/5 overflow-x-auto">
+    <div className=" bg-[#16161E] border border-white/5 overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-white/5">
@@ -280,17 +280,17 @@ function StrategiesSidebar({ code }: { code: string }) {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg bg-[#16161E] border border-white/5 p-4 animate-pulse">
-        <div className="h-4 w-24 rounded bg-white/5 mb-4" />
+      <div className=" bg-[#16161E] border border-white/5 p-4 animate-pulse">
+        <div className="h-4 w-24 bg-white/5 mb-4" />
         <div className="space-y-3">
-          {[1, 2].map((i) => <div key={i} className="h-12 rounded bg-white/5" />)}
+          {[1, 2].map((i) => <div key={i} className="h-12 bg-white/5" />)}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg bg-[#16161E] border border-white/5 p-4">
+    <div className=" bg-[#16161E] border border-white/5 p-4">
       <div className="text-xs text-gray-400 mb-4 tracking-wider">运行策略</div>
       {(!strategies || strategies.length === 0) ? (
         <p className="text-xs text-gray-500">暂无策略</p>
@@ -335,14 +335,14 @@ export function FundDetail() {
         <a href="/" className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-white mb-6 transition-colors">
           <ArrowLeft className="h-4 w-4" /> 返回仪表盘
         </a>
-        <div className="flex flex-col items-center gap-4 rounded-lg bg-[#16161E] border border-white/5 p-12">
+        <div className="flex flex-col items-center gap-4 bg-[#16161E] border border-white/5 p-12">
           <p className="text-gray-400">
             {is404 ? `基金 ${code} 不存在` : "加载失败，请重试"}
           </p>
           {!is404 && (
             <button
               onClick={() => refetch()}
-              className="inline-flex items-center gap-2 rounded bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 transition-colors"
+              className="inline-flex items-center gap-2 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 transition-colors"
             >
               <RefreshCw className="h-4 w-4" /> 重试
             </button>

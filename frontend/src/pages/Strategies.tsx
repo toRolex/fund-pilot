@@ -98,7 +98,7 @@ export function Strategies() {
             style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "12px" }}
           >
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-28 rounded border border-[#323248] bg-[#16161E]" />
+              <div key={i} className="h-28 border border-[#323248] bg-[#16161E]" />
             ))}
           </div>
         </div>
@@ -110,11 +110,11 @@ export function Strategies() {
     return (
       <div className="p-6">
         <h1 className="mb-6 text-lg font-semibold text-[#EDEDF0]">策略管理</h1>
-        <div className="flex flex-col items-center gap-4 rounded-lg border border-[#323248] bg-[#16161E] p-12">
+        <div className="flex flex-col items-center gap-4 border border-[#323248] bg-[#16161E] p-12">
           <p className="text-[#A7A7B5]">加载失败，请重试</p>
           <button
             onClick={() => refetch()}
-            className="rounded bg-white/10 px-4 py-2 text-sm text-white transition-colors hover:bg-white/20"
+            className="bg-white/10 px-4 py-2 text-sm text-white transition-colors hover:bg-white/20"
           >
             重试
           </button>
@@ -134,20 +134,20 @@ export function Strategies() {
           href="https://github.com/rolex/fund-signal-workbench/wiki/strategies"
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded bg-[rgba(43,127,255,0.12)] px-4 py-2 text-sm text-[#2B7FFF] transition-colors hover:bg-[rgba(43,127,255,0.2)]"
+          className="bg-[rgba(43,127,255,0.12)] px-4 py-2 text-sm text-[#2B7FFF] transition-colors hover:bg-[rgba(43,127,255,0.2)]"
         >
           添加策略
         </a>
       </div>
 
       {safeStrategies.length === 0 ? (
-        <div className="mb-6 flex flex-col items-center gap-4 rounded-lg border border-[#323248] bg-[#16161E] p-12">
+        <div className="mb-6 flex flex-col items-center gap-4 border border-[#323248] bg-[#16161E] p-12">
           <p className="text-[#A7A7B5]">暂无已注册策略</p>
           <a
             href="https://github.com/rolex/fund-signal-workbench/wiki/strategies"
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded bg-[#2B7FFF] px-4 py-2 text-sm text-white transition-colors hover:bg-[#4A94FF]"
+            className="bg-[#2B7FFF] px-4 py-2 text-sm text-white transition-colors hover:bg-[#4A94FF]"
           >
             查阅文档
           </a>
@@ -167,7 +167,7 @@ export function Strategies() {
         </div>
       )}
 
-      <div className="run-log rounded-lg border border-[#323248] bg-[#16161E]">
+      <div className="run-log border border-[#323248] bg-[#16161E]">
         <div className="run-log-title border-b border-[#323248] px-4 py-3 text-sm font-bold text-[#EDEDF0]">
           运行日志
         </div>

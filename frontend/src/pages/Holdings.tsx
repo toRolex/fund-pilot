@@ -7,18 +7,18 @@ import type { HoldingResponse } from "@/types";
 function LoadingSkeleton() {
   return (
     <div className="animate-pulse space-y-4">
-      <div className="h-10 w-40 rounded-lg border border-white/5 bg-[#16161E]" />
-      <div className="overflow-hidden rounded-lg border border-white/5">
+      <div className="h-10 w-40 border border-white/5 bg-[#16161E]" />
+      <div className="overflow-hidden border border-white/5">
         <div className="space-y-3 bg-[#16161E] p-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="grid grid-cols-7 gap-3">
-              <div className="h-3.5 rounded bg-[#292936]" />
-              <div className="h-3.5 rounded bg-[#292936]" />
-              <div className="h-3.5 rounded bg-[#292936]" />
-              <div className="h-3.5 rounded bg-[#292936]" />
-              <div className="h-3.5 rounded bg-[#292936]" />
-              <div className="h-3.5 rounded bg-[#292936]" />
-              <div className="h-3.5 rounded bg-[#292936]" />
+              <div className="h-3.5 bg-[#292936]" />
+              <div className="h-3.5 bg-[#292936]" />
+              <div className="h-3.5 bg-[#292936]" />
+              <div className="h-3.5 bg-[#292936]" />
+              <div className="h-3.5 bg-[#292936]" />
+              <div className="h-3.5 bg-[#292936]" />
+              <div className="h-3.5 bg-[#292936]" />
             </div>
           ))}
         </div>
@@ -29,7 +29,7 @@ function LoadingSkeleton() {
 
 function EmptyState({ onImport }: { onImport: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-4 rounded-lg border border-white/5 bg-[#16161E] p-12">
+    <div className="flex flex-col items-center gap-4 border border-white/5 bg-[#16161E] p-12">
       <Upload className="h-10 w-10 text-gray-500" />
       <p className="text-gray-400">持仓数据为空</p>
       <p className="max-w-xs text-center text-sm text-gray-500">
@@ -37,7 +37,7 @@ function EmptyState({ onImport }: { onImport: () => void }) {
       </p>
       <button
         onClick={onImport}
-        className="inline-flex items-center gap-2 rounded border border-white/10 bg-transparent px-4 py-2 text-sm text-white transition-colors hover:border-gray-400 hover:bg-white/5"
+        className="inline-flex items-center gap-2 border border-white/10 bg-transparent px-4 py-2 text-sm text-white transition-colors hover:border-gray-400 hover:bg-white/5"
       >
         <Upload className="h-4 w-4" />
         导入持仓
@@ -48,12 +48,12 @@ function EmptyState({ onImport }: { onImport: () => void }) {
 
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-4 rounded-lg border border-white/5 bg-[#16161E] p-12">
+    <div className="flex flex-col items-center gap-4 border border-white/5 bg-[#16161E] p-12">
       <AlertCircle className="h-10 w-10 text-red-400" />
       <p className="text-gray-400">{message}</p>
       <button
         onClick={onRetry}
-        className="inline-flex items-center gap-2 rounded border border-white/10 bg-transparent px-4 py-2 text-sm text-white transition-colors hover:border-gray-400 hover:bg-white/5"
+        className="inline-flex items-center gap-2 border border-white/10 bg-transparent px-4 py-2 text-sm text-white transition-colors hover:border-gray-400 hover:bg-white/5"
       >
         重试
       </button>
@@ -162,14 +162,14 @@ export function Holdings() {
       <div className="import-section mb-4">
         <button
           onClick={handleFileSelect}
-          className="btn-outline inline-flex items-center gap-2 rounded border border-white/10 bg-transparent px-3 py-1.5 text-xs text-white transition-colors hover:border-gray-400 hover:bg-white/5"
+          className="btn-outline inline-flex items-center gap-2 border border-white/10 bg-transparent px-3 py-1.5 text-xs text-white transition-colors hover:border-gray-400 hover:bg-white/5"
         >
           <Upload className="h-3.5 w-3.5" />
           导入持仓数据
         </button>
         <button
           onClick={handleExportSampleCSV}
-          className="ml-2 inline-flex items-center gap-2 rounded border border-white/10 bg-transparent px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-400 hover:bg-white/5 hover:text-white"
+          className="ml-2 inline-flex items-center gap-2 border border-white/10 bg-transparent px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-400 hover:bg-white/5 hover:text-white"
           title="下载示例 CSV"
         >
           <Download className="h-3.5 w-3.5" />
@@ -185,7 +185,7 @@ export function Holdings() {
       </div>
 
       {importError && (
-        <div className="mb-4 rounded-lg border border-red-400/20 bg-red-400/10 px-4 py-2 text-sm text-red-400">
+        <div className="mb-4 border border-red-400/20 bg-red-400/10 px-4 py-2 text-sm text-red-400">
           {importError}
         </div>
       )}
@@ -193,7 +193,7 @@ export function Holdings() {
       {safeHoldings.length === 0 ? (
         <EmptyState onImport={handleFileSelect} />
       ) : (
-        <div className="table-wrap overflow-x-auto rounded-lg border border-white/5">
+        <div className="table-wrap overflow-x-auto border border-white/5">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-white/5">
@@ -234,7 +234,7 @@ export function Holdings() {
                   <td className="p-3">
                     {h.has_signal ? (
                       <span
-                        className="inline-block h-2 w-2 rounded-full"
+                        className="inline-block h-2 w-2"
                         style={{ backgroundColor: "var(--accent)" }}
                         title="有活跃信号"
                       />

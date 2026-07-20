@@ -3,11 +3,11 @@ import { GlobalSearch } from "./GlobalSearch";
 import { StatusBar } from "./StatusBar";
 
 const NAV_ITEMS = [
-  { to: "/", label: "仪表盘" },
-  { to: "/watchlists", label: "观察列表" },
-  { to: "/funds/000001", label: "基金详情" },
-  { to: "/strategies", label: "策略" },
-  { to: "/holdings", label: "持仓" },
+  { to: "/", label: "仪表盘", icon: "▰" },
+  { to: "/watchlists", label: "观察列表", icon: "☰" },
+  { to: "/funds/000001", label: "基金详情", icon: "◉" },
+  { to: "/strategies", label: "策略", icon: "▤" },
+  { to: "/holdings", label: "持仓", icon: "▣" },
 ];
 
 export function AppShell() {
@@ -60,7 +60,8 @@ export function AppShell() {
                 }`
               }
             >
-              {item.label}
+              <span style={{ width: 20, textAlign: "center", fontSize: 14, opacity: ".7" }}>{item.icon}</span>
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -95,7 +96,6 @@ export function AppShell() {
             style={{
               width: 6,
               height: 6,
-              borderRadius: "50%",
               background: "var(--signal-buy)",
               display: "inline-block",
             }}

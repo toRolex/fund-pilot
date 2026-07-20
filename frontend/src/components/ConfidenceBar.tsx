@@ -3,9 +3,9 @@ export function ConfidenceBar({ value }: { value: number }) {
   const level = pct >= 70 ? "high" : pct >= 50 ? "mid" : "low";
   return (
     <span className="conf-bar inline-flex items-center gap-1.5 min-w-[80px]">
-      <span className="conf-track flex-1 h-1 rounded-full bg-[var(--elevated)]">
+      <span className="conf-track flex-1 h-1 bg-[var(--elevated)]">
         <span
-          className={`conf-fill block h-full rounded-full transition-all ${level} ${
+          className={`conf-fill block h-full transition-all ${level} ${
             level === "high"
               ? "bg-[var(--signal-buy)]"
               : level === "mid"

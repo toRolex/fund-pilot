@@ -24,7 +24,7 @@ const SHAPES: Record<SignalType, { className: string; style?: React.CSSPropertie
       borderTop: `8px solid var(--signal-sell)`,
     } as React.CSSProperties,
   },
-  hold: { className: "hold-shape inline-block w-2 h-2 rounded-full bg-[var(--signal-hold)]" },
+  hold: { className: "hold-shape inline-block w-2 h-2 bg-[var(--signal-hold)]" },
 };
 
 // ponytail: CSS-only tooltip, migrate to @headlessui Popover if richer interaction needed
@@ -38,13 +38,13 @@ export function SignalBadge({ type, confidence, strategy }: Props) {
   return (
     <span className="group relative inline-flex">
       <span
-        className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium border ${s.bg}`}
+        className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium border ${s.bg}`}
       >
         <span className={shape.className} style={shape.style} />
         {s.label}
       </span>
       {tooltip && (
-        <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-[#16161E] px-2 py-1 text-xs text-gray-300 opacity-0 shadow-lg ring-1 ring-white/10 transition-opacity group-hover:opacity-100">
+        <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#16161E] px-2 py-1 text-xs text-gray-300 opacity-0 shadow-lg ring-1 ring-white/10 transition-opacity group-hover:opacity-100">
           {tooltip}
         </span>
       )}

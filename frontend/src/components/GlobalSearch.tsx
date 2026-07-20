@@ -86,7 +86,7 @@ export function GlobalSearch() {
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="flex items-center gap-2 bg-root border border-gray-700 rounded-lg px-3 py-1.5">
+      <div className="flex items-center gap-2 bg-root border border-gray-700 px-3 py-1.5">
         <Search size={16} className="text-gray-400 shrink-0" />
         <input
           ref={inputRef}
@@ -116,7 +116,7 @@ export function GlobalSearch() {
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 top-full mt-1 w-full bg-surface border border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+        <div className="absolute z-50 top-full mt-1 w-full bg-surface border border-gray-700 shadow-lg max-h-64 overflow-y-auto">
           {results.length === 0 ? (
             <div className="p-3 text-gray-500 text-sm text-center">
               未找到匹配的基金
