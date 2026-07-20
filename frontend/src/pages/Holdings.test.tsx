@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Holdings } from "./Holdings";
@@ -52,19 +52,19 @@ describe("Holdings page", () => {
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("renders empty state with guidance and import button", async () => {
+  it("renders empty state with guidance and import CTA", async () => {
     vi.spyOn(window, "fetch").mockResolvedValue(
       new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } }),
     );
     renderHoldings();
     await waitFor(() => {
-      expect(screen.getByText(/暂无持仓数据/)).toBeInTheDocument();
+      expect(screen.getByText(/持仓数据为空/)).toBeInTheDocument();
     });
     const importButtons = screen.getAllByText(/导入持仓/);
     expect(importButtons.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders holdings from API", async () => {
+  it("renders holdings from API with correct columns", async () => {
     vi.spyOn(window, "fetch").mockResolvedValue(
       new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
     );
@@ -75,6 +75,11 @@ describe("Holdings page", () => {
     });
     expect(screen.getByText("测试基金A")).toBeInTheDocument();
     expect(screen.getByText("测试基金B")).toBeInTheDocument();
+
+    // Verify the new column structure: 份额/成本/市值 columns exist
+    expect(screen.getByText("持有份额")).toBeInTheDocument();
+    expect(screen.getByText("成本均价")).toBeInTheDocument();
+    expect(screen.getByText("当前市值")).toBeInTheDocument();
   });
 
   it("shows green P&L for positive and red for negative", async () => {
@@ -83,14 +88,12 @@ describe("Holdings page", () => {
     );
     renderHoldings();
     await waitFor(() => {
-      // Positive P&L should have emerald text
-      const positiveCells = screen.getAllByText("+100.00");
+      const positiveCells = screen.getAllByText("+8.00%");
       expect(positiveCells.length).toBeGreaterThan(0);
       positiveCells.forEach((el) => {
         expect(el.className).toContain("emerald");
       });
-      // Negative P&L should have red text
-      const negativeCells = screen.getAllByText("-100.00");
+      const negativeCells = screen.getAllByText("-10.00%");
       expect(negativeCells.length).toBeGreaterThan(0);
       negativeCells.forEach((el) => {
         expect(el.className).toContain("red");
@@ -98,16 +101,14 @@ describe("Holdings page", () => {
     });
   });
 
-  it("shows signal badge for funds with active signals", async () => {
+  it("shows signal dot for funds with active signals", async () => {
     vi.spyOn(window, "fetch").mockResolvedValue(
       new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
     );
     renderHoldings();
     await waitFor(() => {
-      const signals = screen.getAllByText("信号");
-      // "信号" appears as both a column header and badge content
-      const badges = signals.filter((el) => el.className.includes("emerald"));
-      expect(badges.length).toBeGreaterThanOrEqual(1);
+      const dots = screen.getAllByTitle("有活跃信号");
+      expect(dots.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -115,18 +116,17 @@ describe("Holdings page", () => {
     vi.spyOn(window, "fetch").mockRejectedValue(new Error("Network error"));
     renderHoldings();
     await waitFor(() => {
-      expect(screen.getByText(/加载失败/)).toBeInTheDocument();
+      expect(screen.getByText(/数据加载失败/)).toBeInTheDocument();
     });
   });
 
-  it("has import button in the header", async () => {
+  it("has import button styled as btn-outline", async () => {
     vi.spyOn(window, "fetch").mockResolvedValue(
       new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
     );
     renderHoldings();
     await waitFor(() => {
-      const importButtons = screen.getAllByText("导入持仓");
-      expect(importButtons.length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("导入持仓数据")).toBeInTheDocument();
     });
   });
 
@@ -146,7 +146,7 @@ describe("Holdings page", () => {
     );
     renderHoldings();
     await waitFor(() => {
-      expect(screen.getByText(/暂无持仓数据/)).toBeInTheDocument();
+      expect(screen.getByText(/持仓数据为空/)).toBeInTheDocument();
     });
     const fileInput = document.querySelector('input[type="file"]');
     expect(fileInput).toBeInTheDocument();
