@@ -10,7 +10,7 @@ import xalpha as xa
 from app.data import load_fund_price
 from app.db import get_connection as get_db_connection, init_db, query_signals, save_signal_item, save_signal_run
 from app.holdings import HoldingsService
-from app.models import AddFundRequest, Fund, FundDetail, Holding, HoldingResponse, NavPoint, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
+from app.models import AddFundRequest, Fund, FundDetail, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
 from app.scheduler import get_cache, start as start_scheduler, stop as stop_scheduler
 from app.strategies import get_fund_enabled_strategies, get_logs, get_strategy, list_strategies, toggle_enabled, toggle_fund_strategy
 from app.watchlist import WatchlistService
@@ -396,6 +396,26 @@ async def fund_strategy_toggle(code: str, strategy_name: str):
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Strategy '{strategy_name}' not found")
     return {"name": strategy_name, "enabled": enabled}
+
+
+@api.get("/qdii/{code}")
+async def get_qdii_predict(code: str):
+    """QDII fund T-1/T-0 real-time NAV prediction."""
+    try:
+        qdii = xa.QDIIPredict(code)
+        t1_value, t1_date = qdii.get_t1(return_date=True)
+        t0_value, t0_date = qdii.get_t0(return_date=True)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return QdiiPredictResponse(
+        code=code,
+        t1_value=t1_value,
+        t1_date=t1_date,
+        t0_value=t0_value,
+        t0_date=t0_date,
+    )
 
 
 @api.get("/holdings")
