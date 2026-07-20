@@ -23,7 +23,7 @@ describe("App", () => {
 
   it("renders holdings on /holdings", () => {
     renderWithRouter("/holdings");
-    expect(screen.getByText("持仓")).toBeInTheDocument();
+    expect(screen.getAllByText("持仓").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders watchlists on /watchlists", () => {

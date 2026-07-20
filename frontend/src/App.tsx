@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { NavBar } from "./components/NavBar";
-import { StatusBar } from "./components/StatusBar";
+import { AppShell } from "./components/AppShell";
 import { Dashboard } from "./pages/Dashboard";
 import { FundDetail } from "./pages/FundDetail";
 import { Holdings } from "./pages/Holdings";
@@ -14,10 +13,8 @@ const queryClient = new QueryClient();
 
 export function AppRoutes() {
   return (
-    <div className="min-h-screen bg-root">
-      <NavBar />
-      <StatusBar />
-      <Routes>
+    <Routes>
+      <Route element={<AppShell />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/holdings" element={<Holdings />} />
         <Route path="/watchlists" element={<Watchlists />} />
@@ -25,8 +22,8 @@ export function AppRoutes() {
         <Route path="/strategies" element={<Strategies />} />
         <Route path="/funds/:code" element={<FundDetail />} />
         <Route path="*" element={<NotFound />} />
-      </Routes>
-    </div>
+      </Route>
+    </Routes>
   );
 }
 

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { SignalBadge } from "./SignalBadge";
+import { ConfidenceBar } from "../components/ConfidenceBar";
 
 type SortKey = "fund_code" | "fund_name" | "signal_type" | "confidence" | "daily_change";
 
@@ -228,23 +229,6 @@ export function Dashboard() {
           </table>
         </div>
       )}
-    </div>
-  );
-}
-
-function ConfidenceBar({ value }: { value: number }) {
-  const pct = Math.round(value * 100);
-  const color =
-    pct >= 70 ? "bg-emerald-400" : pct >= 40 ? "bg-yellow-400" : "bg-gray-400";
-  return (
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 w-16 rounded-full bg-white/10">
-        <div
-          className={`h-full rounded-full transition-all ${color}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="text-xs text-gray-400">{pct}%</span>
     </div>
   );
 }
