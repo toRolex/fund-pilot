@@ -90,17 +90,6 @@ async def add_fund(body: AddFundRequest):
         pass
 
     if not name:
-        # Fallback: look up in seed data (fictional fund codes not in xalpha)
-        from csv import DictReader
-        seed_path = Path(__file__).resolve().parent.parent / "data" / "watchlist.csv"
-        if seed_path.exists():
-            with open(seed_path) as f:
-                for row in DictReader(f):
-                    if row["code"] == body.code:
-                        name = row["name"]
-                        break
-
-    if not name:
         raise HTTPException(status_code=422, detail=f"Invalid fund code: {body.code}")
     try:
         fund = watchlist.add(body.code, name)
