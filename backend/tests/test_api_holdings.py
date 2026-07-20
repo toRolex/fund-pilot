@@ -1,4 +1,5 @@
 """Tests for /api/holdings endpoints."""
+import pandas as pd
 import pytest
 from unittest.mock import patch
 
@@ -171,8 +172,9 @@ class TestImportHoldings:
 class TestHoldingsPL:
     def test_zero_cost_basis(self, client):
         """Import holding with zero cost_price — handle division by zero."""
-        data = [{"fund_code": "000001", "fund_name": "零成本", "shares": 100.0, "cost_price": 0.0, "current_value": 1.5}]
-        client.post("/api/holdings/import", json=data)
+        with patch("app.holdings.load_fund_price", side_effect=ValueError):
+            data = [{"fund_code": "000001", "fund_name": "零成本", "shares": 100.0, "cost_price": 0.0, "current_value": 1.5}]
+            client.post("/api/holdings/import", json=data)
 
         resp = client.get("/api/holdings")
         h = resp.json()[0]
@@ -181,3 +183,81 @@ class TestHoldingsPL:
         assert h["pl_percent"] == 0.0
         # pl_amount = shares * current_value = 150
         assert h["pl_amount"] == 150.0
+
+
+class TestRefreshPrices:
+    def test_refresh_normal_path(self, client):
+        """POST /api/holdings/refresh updates current_value and recalculates P&L."""
+        def mock_load(code):
+            navs = {"000001": 1.50, "110001": 2.20}
+            nav = navs.get(code, 1.0)
+            return pd.DataFrame({
+                "date": pd.to_datetime(["2024-01-01", "2024-06-01"]),
+                "netvalue": [1.0, nav],
+            })
+
+        with patch("app.holdings.load_fund_price", side_effect=mock_load):
+            resp = client.post("/api/holdings/refresh")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+
+        h1 = next(h for h in data if h["fund_code"] == "000001")
+        assert h1["current_value"] == 1.50
+        # cost_basis=1250, current_total=1500, pl=250, pl%=20.0
+        assert h1["cost_basis"] == 1250.0
+        assert h1["pl_amount"] == 250.0
+        assert h1["pl_percent"] == 20.0
+
+        h2 = next(h for h in data if h["fund_code"] == "110001")
+        assert h2["current_value"] == 2.20
+        # cost_basis=1000, current_total=1100, pl=100, pl%=10.0
+        assert h2["cost_basis"] == 1000.0
+        assert h2["pl_amount"] == 100.0
+        assert h2["pl_percent"] == 10.0
+
+    def test_refresh_xalpha_failure(self, client):
+        """When load_fund_price fails, current_value stays unchanged."""
+        with patch("app.holdings.load_fund_price", side_effect=ValueError("Network error")):
+            resp = client.post("/api/holdings/refresh")
+
+        assert resp.status_code == 200
+        data = resp.json()
+
+        h1 = next(h for h in data if h["fund_code"] == "000001")
+        assert h1["current_value"] == 1.35  # unchanged
+        assert h1["pl_amount"] == 100.0
+        assert h1["pl_percent"] == 8.0
+
+    def test_refresh_empty(self, client):
+        """No crash with empty holdings."""
+        from app import holdings as hs
+        hs._HOLDINGS = {}
+        hs._save()
+
+        resp = client.post("/api/holdings/refresh")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_import_triggers_refresh(self, client):
+        """Import automatically triggers a price refresh."""
+        def mock_load(code):
+            return pd.DataFrame({
+                "date": pd.to_datetime(["2024-01-01", "2024-06-01"]),
+                "netvalue": [10.0, 12.0],
+            })
+
+        with patch("app.holdings.load_fund_price", side_effect=mock_load):
+            resp = client.post("/api/holdings/import", json=[
+                {"fund_code": "999999", "fund_name": "新基金", "shares": 100.0, "cost_price": 10.0, "current_value": 11.0},
+            ])
+
+        assert resp.status_code == 200
+        assert resp.json()["imported"] == 1
+
+        # Verify refresh happened: current_value should be 12.0 (from mock NAV), not 11.0 (imported)
+        resp2 = client.get("/api/holdings")
+        data = resp2.json()
+        assert len(data) == 1
+        assert data[0]["current_value"] == 12.0

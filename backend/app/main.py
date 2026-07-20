@@ -511,7 +511,46 @@ async def import_holdings(request: Request):
         raise HTTPException(status_code=422, detail="No holdings data provided")
 
     holdings_service.import_holdings(holdings)
+    # Auto-refresh prices after import
+    holdings_service.refresh_prices()
     return {"imported": len(holdings)}
+
+
+@api.post("/holdings/refresh")
+async def refresh_holdings():
+    """Refresh current_value for all holdings from latest NAV."""
+    holdings_service.refresh_prices()
+    holdings = holdings_service.list_all()
+    if not holdings:
+        return []
+    return _build_holding_responses(holdings)
+
+
+def _build_holding_responses(holdings: list[Holding]) -> list[HoldingResponse]:
+    """Build HoldingResponse list with P&L and signal enrichment.
+
+    ponytail: inlined rather than refactored into GET /holdings to keep that
+    handler's diff zero.  Merge into list_holdings when touching that code next.
+    """
+    active_codes = _compute_holdings_signal_codes(holdings)
+    result = []
+    for h in holdings:
+        cost_basis = h.shares * h.cost_price
+        current_total = h.shares * h.current_value
+        pl_amount = current_total - cost_basis
+        pl_percent = (pl_amount / cost_basis * 100) if cost_basis > 0 else 0.0
+        result.append(HoldingResponse(
+            fund_code=h.fund_code,
+            fund_name=h.fund_name,
+            shares=h.shares,
+            cost_price=h.cost_price,
+            current_value=h.current_value,
+            cost_basis=round(cost_basis, 4),
+            pl_amount=round(pl_amount, 4),
+            pl_percent=round(pl_percent, 4),
+            has_signal=h.fund_code in active_codes,
+        ))
+    return result
 
 
 # Main app — mounts API and SPA
