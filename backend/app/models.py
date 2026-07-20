@@ -104,3 +104,11 @@ class HoldingResponse(Holding):
     pl_amount: float = 0.0
     pl_percent: float = 0.0
     has_signal: bool = False
+
+
+class QdiiPredictResponse(BaseModel):
+    code: str
+    t1_value: float
+    t1_date: str
+    t0_value: float
+    t0_date: str
