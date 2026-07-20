@@ -18,6 +18,16 @@ _MAX_LOG = 200
 _logs: list[StrategyLog] = []
 
 
+def _fmt_date(raw_date) -> str:
+    """Format a date value to YYYY-MM-DD string."""
+    return raw_date.strftime("%Y-%m-%d") if hasattr(raw_date, "strftime") else str(raw_date)
+
+
+def _merge_params(defaults: dict, overrides: dict | None) -> dict:
+    """Merge default params with optional overrides."""
+    return {**defaults, **(overrides or {})}
+
+
 def _add_log(message: str):
     _logs.append(StrategyLog(
         timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -88,7 +98,7 @@ def indicator_cross(price_df: pd.DataFrame, params: dict | None = None) -> list[
         long_window: int, default 20
         totmoney: int, default 1000 (maps to buy signal magnitude)
     """
-    p = {**dict(short_window=5, long_window=20, totmoney=1000), **(params or {})}
+    p = _merge_params(dict(short_window=5, long_window=20, totmoney=1000), params)
     short_w = p["short_window"]
     long_w = p["long_window"]
 
@@ -123,7 +133,7 @@ def indicator_cross(price_df: pd.DataFrame, params: dict | None = None) -> list[
 
         if signal_type != SignalType.hold:
             signals.append(Signal(
-                date=row["date"].strftime("%Y-%m-%d") if hasattr(row["date"], "strftime") else str(row["date"]),
+                date=_fmt_date(row["date"]),
                 fund_code="",
                 strategy_name="indicator_cross",
                 signal_type=signal_type,
@@ -145,7 +155,7 @@ def pe_percentile(price_df: pd.DataFrame, params: dict | None = None) -> list[Si
         low_pct: float, default 0.20
         high_pct: float, default 0.80
     """
-    p = {**dict(low_pct=0.20, high_pct=0.80), **(params or {})}
+    p = _merge_params(dict(low_pct=0.20, high_pct=0.80), params)
     low_pct = p["low_pct"]
     high_pct = p["high_pct"]
 
@@ -168,11 +178,8 @@ def pe_percentile(price_df: pd.DataFrame, params: dict | None = None) -> list[Si
     else:
         signal_type = SignalType.hold
 
-    last_date = price_df.iloc[-1]["date"]
-    date_str = last_date.strftime("%Y-%m-%d") if hasattr(last_date, "strftime") else str(last_date)
-
     return [Signal(
-        date=date_str,
+        date=_fmt_date(price_df.iloc[-1]["date"]),
         fund_code="",
         strategy_name="pe_percentile",
         signal_type=signal_type,
@@ -191,7 +198,7 @@ def grid(price_df: pd.DataFrame, params: dict | None = None) -> list[Signal]:
         high: float, required (omit returns no signals)
         n_grids: int, default 10
     """
-    p = {**dict(n_grids=10), **(params or {})}
+    p = _merge_params(dict(n_grids=10), params)
     low = p.get("low")
     high = p.get("high")
     n_grids = p["n_grids"]
@@ -215,10 +222,8 @@ def grid(price_df: pd.DataFrame, params: dict | None = None) -> list[Signal]:
             crossed_down = prev > line >= curr
             if crossed_up or crossed_down:
                 sig_type = SignalType.buy if crossed_up else SignalType.sell
-                raw_date = df.iloc[i]["date"]
-                date_str = raw_date.strftime("%Y-%m-%d") if hasattr(raw_date, "strftime") else str(raw_date)
                 signals.append(Signal(
-                    date=date_str,
+                    date=_fmt_date(df.iloc[i]["date"]),
                     fund_code="",
                     strategy_name="grid",
                     signal_type=sig_type,
@@ -237,7 +242,7 @@ def momentum(funds_data: dict[str, pd.DataFrame], params: dict | None = None) ->
     Params:
         n_days: int, default 20
     """
-    p = {**dict(n_days=20), **(params or {})}
+    p = _merge_params(dict(n_days=20), params)
     n_days = p["n_days"]
 
     if not funds_data:
@@ -253,9 +258,7 @@ def momentum(funds_data: dict[str, pd.DataFrame], params: dict | None = None) ->
         if past == 0:
             continue
         ret = (recent - past) / past
-        last_date = sorted_df.iloc[-1]["date"]
-        date_str = last_date.strftime("%Y-%m-%d") if hasattr(last_date, "strftime") else str(last_date)
-        rankings.append((code, ret, date_str))
+        rankings.append((code, ret, _fmt_date(sorted_df.iloc[-1]["date"])))
 
     rankings.sort(key=lambda x: x[1], reverse=True)
 
