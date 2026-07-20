@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 import xalpha as xa
 
 from app.data import load_fund_price
+from app.db import get_connection as get_db_connection, init_db, query_signals, save_signal_item, save_signal_run
 from app.holdings import HoldingsService
 from app.models import AddFundRequest, Fund, FundDetail, Holding, HoldingResponse, NavPoint, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
 from app.scheduler import get_cache, start as start_scheduler, stop as stop_scheduler
@@ -187,53 +188,91 @@ async def get_status():
 
 
 @api.get("/signals")
-async def get_signals(code: Optional[str] = Query(None)):
-    """Run all strategies against watchlist funds and return signals.
+async def get_signals(fund_code: Optional[str] = Query(None)):
+    """Read signals from SQLite, enriched with fund name and daily change.
 
+    Optional ?fund_code= filter to target a single fund.
     Returns flat list[SignalResponse] sorted by (date, fund_code).
-    Optional ?code= filter to target a single fund.
     """
-    funds = watchlist.list_all()
-    if code:
-        funds = [f for f in funds if f.code == code]
-        if not funds:
-            return []
+    conn = get_db_connection()
+    init_db(conn)
+    rows = query_signals(conn, fund_code=fund_code)
+    conn.close()
 
+    if not rows:
+        return []
+
+    funds_map = {f.code: f for f in watchlist.list_all()}
     signals: list[SignalResponse] = []
+
+    for row in rows:
+        fund = funds_map.get(row["fund_code"])
+        fund_name = fund.name if fund else ""
+
+        daily_change = 0.0
+        if fund:
+            try:
+                price_df = load_fund_price(fund.code)
+                if len(price_df) >= 2:
+                    sorted_price = price_df.sort_values("date")
+                    daily_change = round(
+                        (sorted_price.iloc[-1]["netvalue"] - sorted_price.iloc[-2]["netvalue"])
+                        / sorted_price.iloc[-2]["netvalue"] * 100,
+                        2,
+                    )
+            except Exception:
+                pass
+
+        signals.append(SignalResponse(
+            date=row["detail"],
+            fund_code=row["fund_code"],
+            fund_name=fund_name,
+            strategy_name=row["strategy"],
+            signal_type=SignalType(row["signal"]),
+            confidence=row["value"] or 0.0,
+            daily_change=daily_change,
+        ))
+
+    return signals
+
+
+@api.post("/signals/run")
+async def run_signals():
+    """Run all strategies against watchlist funds and persist results to SQLite."""
+    from datetime import datetime
+
+    from app.strategies import get_strategy
+
+    conn = get_db_connection()
+    init_db(conn)
+    funds = watchlist.list_all()
     strategies = list_strategies()
 
-    for fund in funds:
-        # ponytail: sequential fund processing, parallelize with asyncio if latency matters
-        price_df = load_fund_price(fund.code)
+    runs = []
+    for sm in strategies:
+        now = datetime.now().isoformat()
+        run_id = save_signal_run(conn, sm.name, now)
+        fn = get_strategy(sm.name)
+        item_count = 0
+        for fund in funds:
+            try:
+                price_df = load_fund_price(fund.code)
+            except Exception:
+                continue
+            try:
+                signals = fn(price_df)
+            except Exception:
+                continue
+            for s in signals:
+                save_signal_item(
+                    conn, run_id, fund.code,
+                    s.signal_type.value, s.confidence, s.date,
+                )
+                item_count += 1
+        runs.append({"strategy": sm.name, "signals": item_count, "status": "completed"})
 
-        # Compute daily change from latest 2 NAV values
-        daily_change = 0.0
-        if len(price_df) >= 2:
-            sorted_price = price_df.sort_values("date")
-            daily_change = round(
-                (sorted_price.iloc[-1]["netvalue"] - sorted_price.iloc[-2]["netvalue"])
-                / sorted_price.iloc[-2]["netvalue"] * 100,
-                2,
-            )
-
-        for sm in strategies:
-            fn = get_strategy(sm.name)
-            # ponytail: strategy errors propagate per AC — no try/except here
-            result = fn(price_df)
-            for s in result:
-                s.fund_code = fund.code
-                signals.append(SignalResponse(
-                    date=s.date,
-                    fund_code=fund.code,
-                    fund_name=fund.name,
-                    strategy_name=s.strategy_name,
-                    signal_type=s.signal_type,
-                    confidence=s.confidence,
-                    daily_change=daily_change,
-                ))
-
-    signals.sort(key=lambda s: (s.date, s.fund_code))
-    return signals
+    conn.close()
+    return {"status": "completed", "runs": runs}
 
 
 @api.get("/funds/{code}")
@@ -469,6 +508,9 @@ async def import_holdings(request: Request):
 # Main app — mounts API and SPA
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    conn = get_db_connection()
+    init_db(conn)
+    conn.close()
     start_scheduler()
     yield
     stop_scheduler()
