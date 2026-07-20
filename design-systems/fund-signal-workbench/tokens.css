@@ -1,0 +1,101 @@
+/* design-systems/fund-signal-workbench/tokens.css
+ * Structured token bindings for Fund Signal Workbench.
+ * Dark high-contrast, Bloomberg Terminal aesthetic — monospace-first, right angles, blue-cyan accent.
+ */
+
+:root {
+  /* Backgrounds */
+  --bg: #0D0D11;
+  --surface: #16161E;
+  --surface-warm: #1A1A24;
+
+  /* Foreground / Text */
+  --fg: #EDEDF0;
+  --fg-2: #A7A7B5;
+  --muted: #6F6F82;
+  --meta: #2B7FFF;
+
+  /* Borders */
+  --border: #323248;
+  --border-soft: #242438;
+
+  /* Accent (blue-cyan, primary interaction) */
+  --accent: #2B7FFF;
+  --accent-on: #FFFFFF;
+  --accent-hover: color-mix(in oklab, var(--accent), black 12%);
+  --accent-active: color-mix(in oklab, var(--accent), black 20%);
+
+  /* Semantic / Signal colors */
+  --success: #26C99E;     /* buy signal */
+  --warn: #BBB440;        /* hold signal */
+  --danger: #E8844A;      /* sell signal */
+
+  /* Signal background tints (for table rows, badges) */
+  --success-bg: color-mix(in oklab, var(--success), var(--bg) 80%);
+  --warn-bg: color-mix(in oklab, var(--warn), var(--bg) 80%);
+  --danger-bg: color-mix(in oklab, var(--danger), var(--bg) 80%);
+
+  /* Fonts — single monospace stack for the entire UI */
+  --font-display: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  --font-body: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* Type scale (tight product scale) */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+
+  /* Leading & tracking */
+  --leading-body: 1.5;
+  --leading-tight: 1.1;
+  --tracking-display: -0.02em;
+
+  /* Spacing (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Section vertical padding */
+  --section-y-desktop: 48px;
+  --section-y-tablet: 32px;
+  --section-y-phone: 24px;
+
+  /* Border radius — all right angles */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-pill: 0;
+
+  /* Elevation / shadows — minimal */
+  --elev-flat: none;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+  /* Focus ring */
+  --focus-ring: 0 0 0 2px var(--accent);
+
+  /* Motion */
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Layout */
+  --container-max: 1440px;
+  --container-gutter-desktop: 24px;
+  --container-gutter-tablet: 16px;
+  --container-gutter-phone: 12px;
+
+  /* Sidebar */
+  --sidebar-width: 220px;
+  --topbar-height: 44px;
+  --statusbar-height: 28px;
+}

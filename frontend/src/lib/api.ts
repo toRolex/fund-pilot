@@ -1,4 +1,4 @@
-import type { Fund, FundDetail, NavPoint, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
+import type { Fund, FundDetail, HoldingResponse, NavPoint, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
 
 const BASE = "/api";
 
@@ -58,4 +58,6 @@ export const api = {
       `/funds/${code}/strategies/${strategy}`,
       {},
     ),
+  getHoldings: () => request<HoldingResponse[]>("/holdings"),
+  importHoldings: (body: unknown) => requestJSON<{ imported: number }>("/holdings/import", body),
 };

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "od-design-system-project/v1",
+  "id": "fund-signal-workbench",
+  "name": "Fund Signal Workbench",
+  "category": "Dashboard & Productivity",
+  "description": "Deep dark high-contrast design system for a local quantitative fund signal workbench. Bloomberg Terminal / TradingView inspired — monospace-first, right angles, blue-cyan accent, signal-coded status colors.",
+  "source": {
+    "type": "bundled",
+    "origin": "Impeccable DESIGN.md for fund-signal-workbench"
+  },
+  "files": {
+    "design": "DESIGN.md",
+    "tokens": "tokens.css"
+  },
+  "importMode": "normalized",
+  "craft": {
+    "applies": [],
+    "suggested": [
+      "color",
+      "typography",
+      "accessibility-baseline"
+    ],
+    "exemptions": []
+  },
+  "preview": {
+    "dir": "preview",
+    "pages": []
+  }
+}

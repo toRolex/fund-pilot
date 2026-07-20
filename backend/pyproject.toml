@@ -6,12 +6,17 @@ dependencies = [
     "apscheduler>=3.10.0",
     "fastapi>=0.115.0",
     "httpx>=0.28.0",
+    "python-multipart>=0.0.32",
     "uvicorn[standard]>=0.34.0",
     "xalpha>=0.12.4",
 ]
 
 [[tool.uv.index]]
 url = "http://mirrors.aliyun.com/pypi/simple/"
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -20,7 +25,3 @@ pythonpath = ["."]
 dev = [
     "pytest>=8.0",
 ]
-
-[[tool.uv.index]]
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-default = true
