@@ -28,7 +28,7 @@ describe("App", () => {
 
   it("renders watchlists on /watchlists", () => {
     renderWithRouter("/watchlists");
-    expect(screen.getByText("关注列表")).toBeInTheDocument();
+    expect(screen.getAllByText("观察列表").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders signals on /signals", () => {

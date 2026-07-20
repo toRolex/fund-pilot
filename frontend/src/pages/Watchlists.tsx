@@ -1,9 +1,20 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, X, ArrowUpDown, Trash2 } from "lucide-react";
-import type { Fund } from "@/types";
+import { Search, Plus, X, Trash2 } from "lucide-react";
+import type { SignalType, Fund } from "@/types";
+import { SignalBadge } from "./SignalBadge";
+import { ConfidenceBar } from "../components/ConfidenceBar";
 
 const BASE = "/api";
+
+interface WatchlistItem {
+  code: string;
+  name: string;
+  daily_change: number;
+  signal_type: SignalType;
+  strategy_name: string;
+  confidence: number;
+}
 
 async function fetchJSON<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
@@ -11,39 +22,19 @@ async function fetchJSON<T>(path: string): Promise<T> {
   return res.json();
 }
 
-function LoadingSkeleton() {
-  return (
-    <div className="space-y-3 animate-pulse">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="h-10 bg-gray-800 rounded" />
-      ))}
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="text-center py-16 text-gray-400">
-      <p className="text-lg mb-2">关注列表为空</p>
-      <p className="text-sm">搜索基金代码或名称，添加你的第一支基金</p>
-    </div>
-  );
-}
-
 export function Watchlists() {
   const queryClient = useQueryClient();
-  const [sortBy, setSortBy] = useState("code");
-  const [sortDir, setSortDir] = useState("asc");
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Fund[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [addSearch, setAddSearch] = useState("");
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [addResults, setAddResults] = useState<Fund[]>([]);
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
-  const searchRef = useRef<HTMLDivElement>(null);
+  const addPanelRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const { data: funds, isLoading, isError, refetch } = useQuery<Fund[]>({
-    queryKey: ["funds", sortBy, sortDir],
-    queryFn: () => fetchJSON(`/funds?sort_by=${sortBy}&sort_dir=${sortDir}`),
+  const { data: items, isLoading, isError, refetch } = useQuery<WatchlistItem[]>({
+    queryKey: ["watchlist"],
+    queryFn: () => fetchJSON<WatchlistItem[]>("/funds"),
   });
 
   const removeMutation = useMutation({
@@ -52,38 +43,34 @@ export function Watchlists() {
         if (!r.ok) throw new Error("Delete failed");
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["funds"] });
+      queryClient.invalidateQueries({ queryKey: ["watchlist"] });
       setRemoveConfirm(null);
     },
   });
 
-  // Search with debounce
-  const handleSearchInput = useCallback((value: string) => {
-    setSearchQuery(value);
+  // Add search with debounce
+  const handleAddSearchInput = useCallback((value: string) => {
+    setAddSearch(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!value.trim()) {
-      setSearchResults([]);
-      setShowDropdown(false);
+      setAddResults([]);
       return;
     }
     debounceRef.current = setTimeout(async () => {
       try {
-        const results = await fetchJSON<Fund[]>(
-          `/funds/search?q=${encodeURIComponent(value)}`,
-        );
-        setSearchResults(results);
-        setShowDropdown(true);
+        const results = await fetchJSON<Fund[]>(`/funds/search?q=${encodeURIComponent(value)}`);
+        setAddResults(results);
       } catch {
-        setSearchResults([]);
+        setAddResults([]);
       }
     }, 300);
   }, []);
 
-  // Close dropdown on click outside
+  // Close add panel on click outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
+      if (addPanelRef.current && !addPanelRef.current.contains(e.target as Node)) {
+        setShowAddPanel(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -97,130 +84,185 @@ export function Watchlists() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
       });
-      queryClient.invalidateQueries({ queryKey: ["funds"] });
-      setSearchQuery("");
-      setSearchResults([]);
-      setShowDropdown(false);
+      queryClient.invalidateQueries({ queryKey: ["watchlist"] });
+      setAddSearch("");
+      setAddResults([]);
+      setShowAddPanel(false);
     } catch {
       // ponytail: toast/snackbar if UX requires it
     }
   };
 
-  const toggleSort = (column: string) => {
-    if (sortBy === column) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortBy(column);
-      setSortDir("asc");
-    }
-  };
-
-  const SortIcon = ({ column }: { column: string }) => {
-    if (sortBy !== column) return <ArrowUpDown size={14} className="text-gray-500" />;
-    return <span className="text-blue-400">{sortDir === "asc" ? " ▲" : " ▼"}</span>;
-  };
+  const safeItems = items ?? [];
+  const filtered = searchQuery.trim()
+    ? safeItems.filter(
+        (f) =>
+          f.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          f.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+    : safeItems;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-white mb-6">关注列表</h1>
+    <div className="p-6">
+      <h1 className="page-heading">观察列表</h1>
 
-      {/* Search + Add */}
-      <div ref={searchRef} className="relative mb-6">
-        <div className="flex items-center gap-2 bg-surface border border-gray-700 rounded-lg px-3 py-2">
-          <Search size={18} className="text-gray-400 shrink-0" />
+      {/* Header: search + add button */}
+      <div className="wl-header flex gap-3 mb-4 items-center">
+        <div className="wl-search flex-1 max-w-[400px]">
           <input
-            className="flex-1 bg-transparent text-white outline-none placeholder:text-gray-500"
-            placeholder="搜索基金代码或名称"
+            className="w-full h-7 px-2 bg-[var(--elevated)] border border-transparent text-[var(--fg)] font-mono text-xs outline-none focus:border-[var(--accent)] placeholder:text-[var(--muted)]"
+            placeholder="筛选基金..."
             value={searchQuery}
-            onChange={(e) => handleSearchInput(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
-          {searchQuery && (
-            <button onClick={() => { setSearchQuery(""); setSearchResults([]); setShowDropdown(false); }}>
-              <X size={16} className="text-gray-400" />
-            </button>
-          )}
         </div>
+        <button
+          className="btn text-xs"
+          style={{
+            color: "var(--accent)",
+            borderColor: "var(--accent)",
+            background: "transparent",
+          }}
+          onClick={() => setShowAddPanel((v) => !v)}
+        >
+          <Plus size={14} />
+          添加基金
+        </button>
+      </div>
 
-        {/* Search dropdown */}
-        {showDropdown && (
-          <div className="absolute z-10 top-full mt-1 w-full bg-surface border border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-            {searchResults.length === 0 ? (
-              <div className="p-3 text-gray-500 text-sm text-center">
-                未找到匹配的基金
-              </div>
-            ) : (
-              searchResults.map((fund) => (
-                <button
-                  key={fund.code}
-                  className="w-full text-left px-3 py-2 text-white hover:bg-gray-700 flex justify-between items-center"
-                  onClick={() => handleAddFund(fund.code)}
-                >
-                  <span>{fund.code}</span>
-                  <span className="text-gray-400 text-sm">{fund.name}</span>
-                </button>
-              ))
+      {/* Add fund panel */}
+      {showAddPanel && (
+        <div ref={addPanelRef} className="relative mb-4">
+          <div className="flex items-center gap-2 bg-[var(--surface)] border border-[var(--border)] px-3 py-2">
+            <Search size={16} className="text-[var(--muted)] shrink-0" />
+            <input
+              className="flex-1 bg-transparent text-[var(--fg)] outline-none text-xs placeholder:text-[var(--muted)] font-mono"
+              placeholder="搜索基金代码或名称..."
+              value={addSearch}
+              onChange={(e) => handleAddSearchInput(e.target.value)}
+              autoFocus
+            />
+            {addSearch && (
+              <button
+                onClick={() => {
+                  setAddSearch("");
+                  setAddResults([]);
+                }}
+              >
+                <X size={14} className="text-[var(--muted)]" />
+              </button>
             )}
           </div>
-        )}
-      </div>
+          {addResults.length > 0 && (
+            <div className="absolute z-10 top-full mt-1 w-full bg-[var(--surface)] border border-[var(--border)] shadow-lg max-h-48 overflow-y-auto">
+              {addResults.map((fund) => (
+                <button
+                  key={fund.code}
+                  className="w-full text-left px-3 py-2 text-[var(--fg)] hover:bg-[var(--hover)] flex justify-between items-center text-xs"
+                  onClick={() => handleAddFund(fund.code)}
+                >
+                  <span className="font-mono">{fund.code}</span>
+                  <span className="text-[var(--fg-2)]">{fund.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Content area */}
       {isLoading ? (
-        <LoadingSkeleton />
+        <div>
+          <div className="skel" style={{ width: "100%", height: 22, marginBottom: 12 }} />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="skel-row flex gap-3 py-2 border-b border-[var(--border)]">
+              <div className="skel flex-[2]" />
+              <div className="skel flex-1" />
+              <div className="skel flex-1" />
+              <div className="skel flex-[1.5]" />
+              <div className="skel flex-1" />
+              <div className="skel" style={{ width: 80 }} />
+            </div>
+          ))}
+        </div>
       ) : isError ? (
-        <div className="text-center py-16">
-          <p className="text-red-400 mb-4">加载失败，请重试</p>
-          <button
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-            onClick={() => refetch()}
-          >
+        <div className="error-state visible">
+          <div className="error-icon">&#9650;</div>
+          <div className="error-title">数据加载失败</div>
+          <div className="error-desc">无法连接后台服务，请检查后端状态后重试。</div>
+          <button className="btn btn-primary" onClick={() => refetch()}>
             重试
           </button>
         </div>
-      ) : !funds || funds.length === 0 ? (
-        <EmptyState />
+      ) : safeItems.length === 0 ? (
+        <div className="empty-state visible">
+          <div className="empty-icon">&#8801;</div>
+          <div className="empty-title">观察列表为空</div>
+          <div className="empty-desc">
+            开始你的量化信号之旅 — 搜索并添加你的第一只基金到观察列表。
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowAddPanel(true)}
+          >
+            添加基金
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="empty-state visible">
+          <div className="empty-icon">&#8993;</div>
+          <div className="empty-title">无匹配结果</div>
+          <div className="empty-desc">
+            没有找到匹配的基金。尝试使用基金代码或名称关键词搜索。
+          </div>
+        </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="table-wrap">
+          <table>
             <thead>
-              <tr className="border-b border-gray-700 text-gray-400 text-sm">
-                <th
-                  className="py-3 px-4 cursor-pointer hover:text-white select-none"
-                  onClick={() => toggleSort("code")}
-                >
-                  <span className="flex items-center gap-1">
-                    基金代码 <SortIcon column="code" />
-                  </span>
-                </th>
-                <th
-                  className="py-3 px-4 cursor-pointer hover:text-white select-none"
-                  onClick={() => toggleSort("name")}
-                >
-                  <span className="flex items-center gap-1">
-                    基金名称 <SortIcon column="name" />
-                  </span>
-                </th>
-                <th className="py-3 px-4">操作</th>
+              <tr>
+                <th data-col="code">代码 <span className="sort-arrow">&#8593;</span></th>
+                <th data-col="name">基金名称 <span className="sort-arrow">&#8597;</span></th>
+                <th data-col="change" className="num">日涨跌 <span className="sort-arrow">&#8597;</span></th>
+                <th data-col="signal">最新信号 <span className="sort-arrow">&#8597;</span></th>
+                <th data-col="strategy">策略来源 <span className="sort-arrow">&#8597;</span></th>
+                <th data-col="confidence" className="num">置信度 <span className="sort-arrow">&#8597;</span></th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
-              {funds.map((fund) => (
-                <tr key={fund.code} className="border-b border-gray-800 hover:bg-gray-800/50">
-                  <td className="py-3 px-4 text-white font-mono">{fund.code}</td>
-                  <td className="py-3 px-4 text-gray-300">{fund.name}</td>
-                  <td className="py-3 px-4">
-                    {removeConfirm === fund.code ? (
+              {filtered.map((item) => (
+                <tr key={item.code}>
+                  <td className="font-mono">{item.code}</td>
+                  <td>{item.name}</td>
+                  <td className={`num ${item.daily_change >= 0 ? "green" : "red"}`}>
+                    {item.daily_change > 0 ? "+" : ""}
+                    {item.daily_change.toFixed(2)}%
+                  </td>
+                  <td>
+                    <SignalBadge
+                      type={item.signal_type}
+                      confidence={item.confidence}
+                      strategy={item.strategy_name}
+                    />
+                  </td>
+                  <td>{item.strategy_name}</td>
+                  <td className="num">
+                    <ConfidenceBar value={item.confidence} />
+                  </td>
+                  <td>
+                    {removeConfirm === item.code ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-400">确认删除？</span>
+                        <span className="text-xs text-[var(--fg-2)]">确认删除？</span>
                         <button
-                          className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                          onClick={() => removeMutation.mutate(fund.code)}
+                          className="px-2 py-1 text-xs bg-red-500 text-white hover:bg-red-600"
+                          onClick={() => removeMutation.mutate(item.code)}
                           disabled={removeMutation.isPending}
                         >
                           确认
                         </button>
                         <button
-                          className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-500"
+                          className="px-2 py-1 text-xs bg-gray-600 text-white hover:bg-gray-500"
                           onClick={() => setRemoveConfirm(null)}
                         >
                           取消
@@ -228,11 +270,11 @@ export function Watchlists() {
                       </div>
                     ) : (
                       <button
-                        className="text-red-400 hover:text-red-300"
-                        onClick={() => setRemoveConfirm(fund.code)}
-                        title="删除"
+                        className="remove-btn"
+                        onClick={() => setRemoveConfirm(item.code)}
+                        title="移除"
                       >
-                        <Trash2 size={16} />
+                        移除
                       </button>
                     )}
                   </td>

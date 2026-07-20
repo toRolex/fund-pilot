@@ -87,4 +87,3 @@ export interface HoldingResponse extends Holding {
   pl_percent: number;
   has_signal: boolean;
 }
-}
