@@ -12,9 +12,25 @@ interface Props {
   strategy?: string;
 }
 
+const SHAPES: Record<SignalType, { className: string; style?: React.CSSProperties }> = {
+  buy: { className: "buy-shape inline-block w-2 h-2 bg-[var(--signal-buy)]" },
+  sell: {
+    className: "sell-shape inline-block",
+    style: {
+      width: 0,
+      height: 0,
+      borderLeft: "5px solid transparent",
+      borderRight: "5px solid transparent",
+      borderTop: `8px solid var(--signal-sell)`,
+    } as React.CSSProperties,
+  },
+  hold: { className: "hold-shape inline-block w-2 h-2 rounded-full bg-[var(--signal-hold)]" },
+};
+
 // ponytail: CSS-only tooltip, migrate to @headlessui Popover if richer interaction needed
 export function SignalBadge({ type, confidence, strategy }: Props) {
   const s = STYLES[type];
+  const shape = SHAPES[type];
   const tooltip = [strategy && `策略: ${strategy}`, confidence != null && `置信度: ${Math.round(confidence * 100)}%`]
     .filter(Boolean)
     .join(" | ");
@@ -22,8 +38,9 @@ export function SignalBadge({ type, confidence, strategy }: Props) {
   return (
     <span className="group relative inline-flex">
       <span
-        className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border ${s.bg}`}
+        className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium border ${s.bg}`}
       >
+        <span className={shape.className} style={shape.style} />
         {s.label}
       </span>
       {tooltip && (

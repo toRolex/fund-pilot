@@ -1,3 +1,46 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --bg: #0d0d11;
+  --surface: #16161e;
+  --elevated: #1f1f29;
+  --hover: #292936;
+  --fg: #ededf0;
+  --fg-2: #a7a7b5;
+  --muted: #6f6f82;
+  --accent: #2b7fff;
+  --accent-hover: #4a94ff;
+  --accent-muted: rgba(43, 127, 255, 0.12);
+  --border: #323248;
+  --signal-buy: #26c99e;
+  --signal-sell: #e8844a;
+  --signal-hold: #bbb440;
+  --signal-buy-bg: rgba(38, 201, 158, 0.12);
+  --signal-sell-bg: rgba(232, 132, 74, 0.12);
+  --signal-hold-bg: rgba(187, 180, 64, 0.12);
+  --sidebar-w: 220px;
+  --topbar-h: 44px;
+  --statusbar-h: 28px;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: "JetBrains Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans SC",
+    sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+}
