@@ -49,7 +49,8 @@ describe("Dashboard", () => {
   it("shows loading skeleton initially", () => {
     vi.mocked(api.getSignals).mockImplementationOnce(() => new Promise(() => {}));
     renderDashboard();
-    expect(document.querySelector(".animate-pulse")).toBeTruthy();
+    expect(screen.getByText("信号仪表盘")).toBeInTheDocument();
+    expect(document.querySelector(".skel")).toBeTruthy();
   });
 
   it("renders signal summary and table with data", async () => {
@@ -61,10 +62,16 @@ describe("Dashboard", () => {
       expect(screen.getByText("测试基金A")).toBeInTheDocument();
     });
 
-    // Summary stats and badge both exist
+    // Stat badges
     expect(screen.getAllByText("买入").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("卖出").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("基金代码")).toBeInTheDocument();
+    expect(screen.getAllByText("持有").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/共 2 只基金/)).toBeInTheDocument();
+
+    // Table headers
+    expect(screen.getByText("代码")).toBeInTheDocument();
+    expect(screen.getByText("最新信号")).toBeInTheDocument();
+    expect(screen.getByText("置信度")).toBeInTheDocument();
   });
 
   it("shows empty state when no signals", async () => {
@@ -73,7 +80,7 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getByText(/暂无信号/)).toBeInTheDocument();
+      expect(screen.getByText("暂无信号数据")).toBeInTheDocument();
     });
   });
 
@@ -83,7 +90,7 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getByText(/加载失败/)).toBeInTheDocument();
+      expect(screen.getByText("数据加载失败")).toBeInTheDocument();
     });
 
     expect(screen.getByText("重试")).toBeInTheDocument();
