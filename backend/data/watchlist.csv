@@ -1,0 +1,13 @@
+code,name,type
+CN-AM-001,Alpha 动量,股票型
+CN-BV-003,Beta 价值,股票型
+CN-GQ-007,Gamma 量化,混合型
+CN-DM-012,Delta 宏观,债券型
+CN-EG-021,Epsilon 成长,股票型
+CN-ZA-005,Zeta 套利,混合型
+CN-EF-018,Eta 因子,指数型
+CN-TM-009,Theta 动量 II,股票型
+CN-IY-015,Iota 收益,债券型
+CN-KV-002,Kappa 价值发现,股票型
+CN-LM-008,Lambda 动量 III,混合型
+CN-MU-011,Mu 多元资产,混合型

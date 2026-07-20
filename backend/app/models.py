@@ -72,6 +72,14 @@ class FundDetail(Fund):
     daily_change: float = 0.0
 
 
+class WatchlistFund(Fund):
+    """Fund with signal enrichment for the watchlist page."""
+    daily_change: float = 0.0
+    signal_type: SignalType = SignalType.hold
+    strategy_name: str = ""
+    confidence: float = 0.0
+
+
 class NavPoint(BaseModel):
     date: str
     netvalue: float

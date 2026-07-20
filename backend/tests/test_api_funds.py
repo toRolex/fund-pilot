@@ -2,6 +2,8 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
+
 
 FUNDS_CSV = """code,name,type
 000001,测试基金A,股票型
@@ -56,13 +58,36 @@ class TestListFunds:
         data = resp.json()
         assert data[0]["code"] == "110001"
 
+    @patch("app.main.load_fund_price")
+    def test_list_enriched_fields(self, mock_load, client):
+        """GET /api/funds should return enriched fields (daily_change, signal_type, etc)."""
+        mock_price = pd.DataFrame({
+            "date": pd.date_range("2024-01-01", periods=50, freq="D"),
+            "netvalue": [1.0] * 25 + [1.0 + i * 0.02 for i in range(25)],
+        })
+        mock_load.return_value = mock_price
+
+        resp = client.get("/api/funds")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        for item in data:
+            assert "code" in item
+            assert "name" in item
+            assert "daily_change" in item
+            assert "signal_type" in item
+            assert "strategy_name" in item
+            assert "confidence" in item
+        # With uptrend price data, at least one fund should have a buy signal
+        assert any(item["signal_type"] != "hold" for item in data)
+
 
 class TestAddFund:
     @patch("app.main.xa")
     def test_add_fund_201(self, mock_xa, client):
         mock_fund = MagicMock()
-        mock_fund.info = {"name": "新基金", "fund_type": "股票型"}
-        mock_xa.mfund.return_value = mock_fund
+        mock_fund.name = "新基金"
+        mock_xa.fundinfo.return_value = mock_fund
 
         resp = client.post("/api/funds", json={"code": "000002"})
         assert resp.status_code == 201
@@ -76,7 +101,7 @@ class TestAddFund:
 
     @patch("app.main.xa")
     def test_add_invalid_code_422(self, mock_xa, client):
-        mock_xa.mfund.side_effect = ValueError("invalid fund code")
+        mock_xa.fundinfo.side_effect = ValueError("invalid fund code")
 
         resp = client.post("/api/funds", json={"code": "999999"})
         assert resp.status_code == 422
@@ -84,8 +109,8 @@ class TestAddFund:
     @patch("app.main.xa")
     def test_add_duplicate_409(self, mock_xa, client):
         mock_fund = MagicMock()
-        mock_fund.info = {"name": "重复", "fund_type": "股票型"}
-        mock_xa.mfund.return_value = mock_fund
+        mock_fund.name = "重复"
+        mock_xa.fundinfo.return_value = mock_fund
 
         resp = client.post("/api/funds", json={"code": "000001"})
         assert resp.status_code == 409

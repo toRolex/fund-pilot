@@ -60,7 +60,7 @@ class TestFundDetail:
             "fund_scale": 12.5,
             "established_date": "2020-01-01",
         }
-        mock_xa.mfund.return_value = mock_fund
+        mock_xa.fundinfo.return_value = mock_fund
 
         resp = client.get("/api/funds/000001")
         data = resp.json()

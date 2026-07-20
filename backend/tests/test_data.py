@@ -23,7 +23,7 @@ def test_load_fund_price_returns_dataframe():
     mock_info.price = mock_price
 
     with patch("app.data.xa") as mock_xa:
-        mock_xa.mfund.return_value = mock_info
+        mock_xa.fundinfo.return_value = mock_info
         result = load_fund_price("000001")
 
     assert isinstance(result, pd.DataFrame)
@@ -32,11 +32,33 @@ def test_load_fund_price_returns_dataframe():
     assert len(result) == 3
 
 
+def test_load_fund_price_fallback_to_csv(tmp_path):
+    """When xalpha fails, load_fund_price should fall back to local CSV."""
+    from app.data import load_fund_price
+
+    # Create a price CSV in the data/prices directory
+    prices_dir = tmp_path / "prices"
+    prices_dir.mkdir(parents=True)
+    csv_path = prices_dir / "000001.csv"
+    csv_path.write_text("date,netvalue\n2024-01-01,1.0\n2024-01-02,1.1\n")
+
+    # Patch DATA_DIR to point to tmp_path
+    with patch("app.data.DATA_DIR", tmp_path):
+        with patch("app.data.xa") as mock_xa:
+            mock_xa.fundinfo.side_effect = ValueError("xalpha failed")
+            result = load_fund_price("000001")
+
+    assert isinstance(result, pd.DataFrame)
+    assert "date" in result.columns
+    assert "netvalue" in result.columns
+    assert len(result) == 2
+
+
 def test_load_fund_price_propagates_error():
-    """load_fund_price should propagate xalpha errors."""
+    """load_fund_price should propagate error when xalpha fails and no CSV fallback."""
     from app.data import load_fund_price
 
     with patch("app.data.xa") as mock_xa:
-        mock_xa.mfund.side_effect = ValueError("network error")
-        with pytest.raises(ValueError, match="network error"):
+        mock_xa.fundinfo.side_effect = ValueError("network error")
+        with pytest.raises(ValueError, match="Failed to load price data"):
             load_fund_price("000001")
