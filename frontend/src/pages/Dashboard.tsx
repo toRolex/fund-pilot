@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { SignalBadge } from "./SignalBadge";
 import { ConfidenceBar } from "../components/ConfidenceBar";
@@ -14,46 +14,30 @@ function useSignals() {
   });
 }
 
-function SummaryCard({ label, count, color }: { label: string; count: number; color: string }) {
-  return (
-    <div className="rounded-lg bg-[#16161E] border border-white/5 p-4 flex flex-col items-center gap-1">
-      <span className={`text-2xl font-bold ${color}`}>{count}</span>
-      <span className="text-xs text-gray-400">{label}</span>
-    </div>
-  );
-}
-
-function LoadingSkeleton() {
-  return (
-    <div className="animate-pulse space-y-4">
-      <div className="grid grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-20 rounded-lg bg-[#16161E] border border-white/5" />
-        ))}
-      </div>
-      <div className="h-64 rounded-lg bg-[#16161E] border border-white/5" />
-    </div>
-  );
-}
-
-const SORT_LABELS: Record<SortKey, string> = {
-  fund_code: "基金代码",
-  fund_name: "基金名称",
-  signal_type: "信号",
-  confidence: "置信度",
-  daily_change: "日涨跌",
-};
-
 export function Dashboard() {
   const { data: signals, isLoading, isError, refetch } = useSignals();
   const [sortKey, setSortKey] = useState<SortKey>("fund_code");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const navigate = useNavigate();
 
   if (isLoading) {
     return (
       <div className="p-6">
-        <h1 className="mb-6 text-xl font-bold text-white">信号仪表盘</h1>
-        <LoadingSkeleton />
+        <h1 className="page-heading">信号仪表盘</h1>
+        <div className="skel" style={{ width: 180, height: 22, marginBottom: 16 }} />
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div
+            key={i}
+            className="flex gap-3 py-2 border-b border-[var(--border)]"
+          >
+            <div className="skel flex-[2]" />
+            <div className="skel flex-1" />
+            <div className="skel flex-1" />
+            <div className="skel flex-[1.5]" />
+            <div className="skel flex-1" />
+            <div className="skel" style={{ width: 80 }} />
+          </div>
+        ))}
       </div>
     );
   }
@@ -61,14 +45,14 @@ export function Dashboard() {
   if (isError) {
     return (
       <div className="p-6">
-        <h1 className="mb-6 text-xl font-bold text-white">信号仪表盘</h1>
-        <div className="flex flex-col items-center gap-4 rounded-lg bg-[#16161E] border border-white/5 p-12">
-          <p className="text-gray-400">加载失败，请重试</p>
-          <button
-            onClick={() => refetch()}
-            className="inline-flex items-center gap-2 rounded bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 transition-colors"
-          >
-            <RefreshCw className="h-4 w-4" />
+        <h1 className="page-heading">信号仪表盘</h1>
+        <div className="error-state visible">
+          <div className="error-icon">&#9650;</div>
+          <div className="error-title">数据加载失败</div>
+          <div className="error-desc">
+            无法连接后台服务，请检查后端状态后重试。
+          </div>
+          <button className="btn btn-primary" onClick={() => refetch()}>
             重试
           </button>
         </div>
@@ -81,8 +65,6 @@ export function Dashboard() {
   const sellCount = safeSignals.filter((s) => s.signal_type === "sell").length;
   const holdCount = safeSignals.filter((s) => s.signal_type === "hold").length;
   const totalFunds = new Set(safeSignals.map((s) => s.fund_code)).size;
-  // If some funds have no signal, they count as hold
-  const displayHoldCount = holdCount; // ponytail: simple count, cross-ref with watchlist total if accuracy matters
 
   const sorted = [...safeSignals].sort((a, b) => {
     let cmp = 0;
@@ -115,112 +97,139 @@ export function Dashboard() {
     }
   }
 
-  function SortHeader({ sortKey: key }: { sortKey: SortKey }) {
-    const active = sortKey === key;
-    return (
-      <button
-        onClick={() => toggleSort(key)}
-        className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-white transition-colors"
-      >
-        {SORT_LABELS[key]}
-        {active ? (
-          sortDir === "asc" ? (
-            <ArrowUp className="h-3 w-3" />
-          ) : (
-            <ArrowDown className="h-3 w-3" />
-          )
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-40" />
-        )}
-      </button>
-    );
+  function sortArrow(key: SortKey) {
+    if (sortKey !== key) return "↕";
+    return sortDir === "asc" ? "↑" : "↓";
   }
+
+  const hasSignals = buyCount + sellCount + holdCount > 0;
 
   return (
     <div className="p-6">
-      <h1 className="mb-6 text-xl font-bold text-white">信号仪表盘</h1>
+      <h1 className="page-heading">信号仪表盘</h1>
 
-      {/* Summary */}
-      <div className="mb-6 grid grid-cols-4 gap-4">
-        <SummaryCard label="基金总数" count={totalFunds} color="text-white" />
-        <SummaryCard label="买入" count={buyCount} color="text-emerald-400" />
-        <SummaryCard label="卖出" count={sellCount} color="text-orange-400" />
-        <SummaryCard label="持有" count={displayHoldCount} color="text-yellow-400" />
+      <div className="stats-row">
+        <div className="stat-badge buy">
+          <span className="count">{buyCount}</span>
+          <span className="label">买入</span>
+        </div>
+        <div className="stat-badge sell">
+          <span className="count">{sellCount}</span>
+          <span className="label">卖出</span>
+        </div>
+        <div className="stat-badge hold">
+          <span className="count">{holdCount}</span>
+          <span className="label">持有</span>
+        </div>
+        <div className="stat-badge total">
+          <span className="label">共 {totalFunds} 只基金</span>
+        </div>
       </div>
 
-      {/* Table */}
-      {safeSignals.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg bg-[#16161E] border border-white/5 p-12">
-          <p className="text-gray-400">策略运行中，暂无信号</p>
+      {!hasSignals ? (
+        <div className="empty-state visible">
+          <div className="empty-icon">&#9670;</div>
+          <div className="empty-title">暂无信号数据</div>
+          <div className="empty-desc">
+            策略正在运行，尚未生成信号。请等待策略完成首次分析。
+          </div>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg bg-[#16161E] border border-white/5">
-          <table className="w-full text-left text-sm">
+        <div className="table-wrap">
+          <table>
             <thead>
-              <tr className="border-b border-white/5">
-                <th className="p-3">
-                  <SortHeader sortKey="fund_code" />
+              <tr>
+                <th
+                  data-col="code"
+                  className={sortKey === "fund_code" ? "sorted" : ""}
+                  onClick={() => toggleSort("fund_code")}
+                >
+                  代码 <span className="sort-arrow">{sortArrow("fund_code")}</span>
                 </th>
-                <th className="p-3">
-                  <SortHeader sortKey="fund_name" />
+                <th
+                  data-col="name"
+                  className={sortKey === "fund_name" ? "sorted" : ""}
+                  onClick={() => toggleSort("fund_name")}
+                >
+                  基金名称{" "}
+                  <span className="sort-arrow">{sortArrow("fund_name")}</span>
                 </th>
-                <th className="p-3">
-                  <SortHeader sortKey="daily_change" />
+                <th
+                  data-col="change"
+                  className={
+                    "num" + (sortKey === "daily_change" ? " sorted" : "")
+                  }
+                  onClick={() => toggleSort("daily_change")}
+                >
+                  日涨跌{" "}
+                  <span className="sort-arrow">
+                    {sortArrow("daily_change")}
+                  </span>
                 </th>
-                <th className="p-3">
-                  <SortHeader sortKey="signal_type" />
+                <th
+                  data-col="signal"
+                  className={sortKey === "signal_type" ? "sorted" : ""}
+                  onClick={() => toggleSort("signal_type")}
+                >
+                  最新信号{" "}
+                  <span className="sort-arrow">
+                    {sortArrow("signal_type")}
+                  </span>
                 </th>
-                <th className="p-3 text-xs font-medium text-gray-400">策略</th>
-                <th className="p-3">
-                  <SortHeader sortKey="confidence" />
+                <th data-col="strategy">策略来源</th>
+                <th
+                  data-col="confidence"
+                  className={
+                    "num" + (sortKey === "confidence" ? " sorted" : "")
+                  }
+                  onClick={() => toggleSort("confidence")}
+                >
+                  置信度{" "}
+                  <span className="sort-arrow">
+                    {sortArrow("confidence")}
+                  </span>
                 </th>
-                <th className="p-3 text-xs font-medium text-gray-400">操作</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
               {sorted.map((signal) => (
                 <tr
                   key={`${signal.fund_code}-${signal.strategy_name}`}
-                  className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
-                  onClick={() => {
-                    // ponytail: navigate to fund detail, link when that page exists
-                    window.location.href = `/funds/${signal.fund_code}`;
-                  }}
+                  onClick={() => navigate(`/funds/${signal.fund_code}`)}
                 >
-                  <td className="p-3 text-white font-mono text-xs">{signal.fund_code}</td>
-                  <td className="p-3 text-white text-xs">{signal.fund_name}</td>
-                  <td className="p-3">
-                    <span
-                      className={`text-xs font-medium ${
-                        signal.daily_change > 0
-                          ? "text-red-400"
-                          : signal.daily_change < 0
-                            ? "text-green-400"
-                            : "text-gray-400"
-                      }`}
-                    >
-                      {signal.daily_change > 0 ? "+" : ""}
-                      {signal.daily_change}%
-                    </span>
+                  <td>{signal.fund_code}</td>
+                  <td>{signal.fund_name}</td>
+                  <td
+                    className={
+                      "num" + (signal.daily_change >= 0 ? " green" : " red")
+                    }
+                  >
+                    {signal.daily_change > 0 ? "+" : ""}
+                    {signal.daily_change.toFixed(2)}%
                   </td>
-                  <td className="p-3">
+                  <td>
                     <SignalBadge
                       type={signal.signal_type}
                       confidence={signal.confidence}
                       strategy={signal.strategy_name}
                     />
                   </td>
-                  <td className="p-3 text-gray-400 text-xs">{signal.strategy_name}</td>
-                  <td className="p-3">
+                  <td>{signal.strategy_name}</td>
+                  <td className="num">
                     <ConfidenceBar value={signal.confidence} />
                   </td>
-                  <td className="p-3">
+                  <td>
                     <a
                       href={`/funds/${signal.fund_code}`}
-                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
                       onClick={(e) => e.stopPropagation()}
+                      style={{
+                        color: "var(--accent)",
+                        fontSize: "var(--fs-tiny)",
+                        cursor: "pointer",
+                      }}
                     >
-                      详情
+                      查看
                     </a>
                   </td>
                 </tr>

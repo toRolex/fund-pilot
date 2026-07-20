@@ -56,6 +56,14 @@ describe("Strategies Page", () => {
     vi.clearAllMocks();
   });
 
+  it("renders loading skeleton", () => {
+    vi.mocked(api.getStrategies).mockReturnValue(new Promise(() => {}));
+    vi.mocked(api.getStrategyLogs).mockReturnValue(new Promise(() => {}));
+    renderStrategies();
+    const skeletons = document.querySelectorAll(".animate-pulse");
+    expect(skeletons.length).toBeGreaterThan(0);
+  });
+
   it("renders page title", async () => {
     vi.mocked(api.getStrategies).mockResolvedValueOnce(mockStrategies);
     vi.mocked(api.getStrategyLogs).mockResolvedValueOnce(mockLogs);
