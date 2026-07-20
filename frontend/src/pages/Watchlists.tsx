@@ -1,9 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Plus, X, Trash2 } from "lucide-react";
+import { Search, Plus, X } from "lucide-react";
 import type { SignalType, Fund } from "@/types";
 import { SignalBadge } from "./SignalBadge";
-import { ConfidenceBar } from "../components/ConfidenceBar";
+import { ConfidenceBar } from "@/components/ConfidenceBar";
+import { ErrorState } from "@/components/ErrorState";
+import { EmptyState } from "@/components/EmptyState";
+import { TableSkeleton } from "@/components/TableSkeleton";
 
 const BASE = "/api";
 
@@ -172,50 +175,26 @@ export function Watchlists() {
 
       {/* Content area */}
       {isLoading ? (
-        <div>
-          <div className="skel" style={{ width: "100%", height: 22, marginBottom: 12 }} />
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="skel-row flex gap-3 py-2 border-b border-[var(--border)]">
-              <div className="skel flex-[2]" />
-              <div className="skel flex-1" />
-              <div className="skel flex-1" />
-              <div className="skel flex-[1.5]" />
-              <div className="skel flex-1" />
-              <div className="skel" style={{ width: 80 }} />
-            </div>
-          ))}
-        </div>
+        <TableSkeleton />
       ) : isError ? (
-        <div className="error-state visible">
-          <div className="error-icon">&#9650;</div>
-          <div className="error-title">数据加载失败</div>
-          <div className="error-desc">无法连接后台服务，请检查后端状态后重试。</div>
-          <button className="btn btn-primary" onClick={() => refetch()}>
-            重试
-          </button>
-        </div>
+        <ErrorState onRetry={() => refetch()} />
       ) : safeItems.length === 0 ? (
-        <div className="empty-state visible">
-          <div className="empty-icon">&#8801;</div>
-          <div className="empty-title">观察列表为空</div>
-          <div className="empty-desc">
-            开始你的量化信号之旅 — 搜索并添加你的第一只基金到观察列表。
-          </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowAddPanel(true)}
-          >
-            添加基金
-          </button>
-        </div>
+        <EmptyState
+          icon={"≡"}
+          title="观察列表为空"
+          description="开始你的量化信号之旅 — 搜索并添加你的第一只基金到观察列表。"
+          action={
+            <button className="btn btn-primary" onClick={() => setShowAddPanel(true)}>
+              添加基金
+            </button>
+          }
+        />
       ) : filtered.length === 0 ? (
-        <div className="empty-state visible">
-          <div className="empty-icon">&#8993;</div>
-          <div className="empty-title">无匹配结果</div>
-          <div className="empty-desc">
-            没有找到匹配的基金。尝试使用基金代码或名称关键词搜索。
-          </div>
-        </div>
+        <EmptyState
+          icon={"⇓"}
+          title="无匹配结果"
+          description="没有找到匹配的基金。尝试使用基金代码或名称关键词搜索。"
+        />
       ) : (
         <div className="table-wrap">
           <table>

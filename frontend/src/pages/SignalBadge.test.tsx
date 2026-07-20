@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { SignalBadge } from "./SignalBadge";
+import { SignalBadge, SignalBuyMarker, SignalSellMarker, SignalHoldMarker } from "./SignalBadge";
+
+function renderInSvg(el: React.ReactElement) {
+  return render(<svg>{el}</svg>);
+}
 
 describe("SignalBadge", () => {
   it("renders buy badge with green styling", () => {
@@ -49,5 +53,30 @@ describe("SignalBadge", () => {
     expect(screen.getByText("买入")).toBeInTheDocument();
     expect(screen.getByText(/indicator_cross/)).toBeInTheDocument();
     expect(screen.getByText(/85%/)).toBeInTheDocument();
+  });
+});
+
+describe("Signal SVG markers", () => {
+  it("SignalBuyMarker renders circles", () => {
+    const { container } = renderInSvg(<SignalBuyMarker cx={10} cy={20} />);
+    const circles = container.querySelectorAll("circle");
+    expect(circles.length).toBe(2);
+    expect(circles[0].getAttribute("cx")).toBe("10");
+    expect(circles[1].getAttribute("cy")).toBe("20");
+  });
+
+  it("SignalSellMarker renders a polygon", () => {
+    const { container } = renderInSvg(<SignalSellMarker cx={10} cy={20} />);
+    const poly = container.querySelector("polygon");
+    expect(poly).toBeInTheDocument();
+    expect(poly!.getAttribute("points")).toContain("10");
+  });
+
+  it("SignalHoldMarker renders a rect", () => {
+    const { container } = renderInSvg(<SignalHoldMarker cx={10} cy={20} />);
+    const rect = container.querySelector("rect");
+    expect(rect).toBeInTheDocument();
+    expect(rect!.getAttribute("x")).toBe("7");
+    expect(rect!.getAttribute("y")).toBe("17");
   });
 });

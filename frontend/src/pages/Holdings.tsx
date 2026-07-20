@@ -1,7 +1,9 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Upload, Download, AlertCircle } from "lucide-react";
+import { Upload, Download } from "lucide-react";
 import { api } from "@/lib/api";
+import { ErrorState } from "@/components/ErrorState";
+import { EmptyState } from "@/components/EmptyState";
 import type { HoldingResponse } from "@/types";
 
 function LoadingSkeleton() {
@@ -23,40 +25,6 @@ function LoadingSkeleton() {
           ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-function EmptyState({ onImport }: { onImport: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-4 border border-white/5 bg-[#16161E] p-12">
-      <Upload className="h-10 w-10 text-gray-500" />
-      <p className="text-gray-400">持仓数据为空</p>
-      <p className="max-w-xs text-center text-sm text-gray-500">
-        导入你的持仓数据以查看盈亏及信号联动分析。支持 CSV 和 JSON 格式。
-      </p>
-      <button
-        onClick={onImport}
-        className="inline-flex items-center gap-2 border border-white/10 bg-transparent px-4 py-2 text-sm text-white transition-colors hover:border-gray-400 hover:bg-white/5"
-      >
-        <Upload className="h-4 w-4" />
-        导入持仓
-      </button>
-    </div>
-  );
-}
-
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-4 border border-white/5 bg-[#16161E] p-12">
-      <AlertCircle className="h-10 w-10 text-red-400" />
-      <p className="text-gray-400">{message}</p>
-      <button
-        onClick={onRetry}
-        className="inline-flex items-center gap-2 border border-white/10 bg-transparent px-4 py-2 text-sm text-white transition-colors hover:border-gray-400 hover:bg-white/5"
-      >
-        重试
-      </button>
     </div>
   );
 }
@@ -191,7 +159,20 @@ export function Holdings() {
       )}
 
       {safeHoldings.length === 0 ? (
-        <EmptyState onImport={handleFileSelect} />
+        <EmptyState
+          icon={<Upload className="h-10 w-10 text-gray-500" />}
+          title="持仓数据为空"
+          description="导入你的持仓数据以查看盈亏及信号联动分析。支持 CSV 和 JSON 格式。"
+          action={
+            <button
+              onClick={handleFileSelect}
+              className="inline-flex items-center gap-2 border border-white/10 bg-transparent px-4 py-2 text-sm text-white transition-colors hover:border-gray-400 hover:bg-white/5"
+            >
+              <Upload className="h-4 w-4" />
+              导入持仓
+            </button>
+          }
+        />
       ) : (
         <div className="table-wrap overflow-x-auto border border-white/5">
           <table className="w-full text-left text-sm">
