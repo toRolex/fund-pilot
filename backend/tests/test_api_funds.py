@@ -107,6 +107,14 @@ class TestAddFund:
         assert resp.status_code == 422
 
     @patch("app.main.xa")
+    def test_add_seed_code_no_fallback_422(self, mock_xa, client):
+        """Seed data codes (CN-AM-xxx) should NOT be found when xalpha fails."""
+        mock_xa.fundinfo.side_effect = ValueError("invalid fund code")
+
+        resp = client.post("/api/funds", json={"code": "CN-AM-001"})
+        assert resp.status_code == 422
+
+    @patch("app.main.xa")
     def test_add_duplicate_409(self, mock_xa, client):
         mock_fund = MagicMock()
         mock_fund.name = "重复"
