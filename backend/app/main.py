@@ -248,27 +248,54 @@ async def run_signals():
     funds = watchlist.list_all()
     strategies = list_strategies()
 
+    # Pre-load all fund prices once for multi-fund strategies
+    fund_prices: dict[str, object] = {}
+    for fund in funds:
+        try:
+            fund_prices[fund.code] = load_fund_price(fund.code)
+        except Exception:
+            continue
+
     runs = []
     for sm in strategies:
         now = datetime.now().isoformat()
         run_id = save_signal_run(conn, sm.name, now)
         fn = get_strategy(sm.name)
         item_count = 0
-        for fund in funds:
-            try:
-                price_df = load_fund_price(fund.code)
-            except Exception:
+        # ponytail: multi-fund strategies get the dict; per-fund strategies loop as before
+        if getattr(fn, "multi_fund", False):
+            if not fund_prices:
+                runs.append({"strategy": sm.name, "signals": 0, "status": "completed"})
                 continue
             try:
-                signals = fn(price_df)
+                signals = fn(fund_prices)
             except Exception:
+                runs.append({"strategy": sm.name, "signals": 0, "status": "completed"})
                 continue
             for s in signals:
+                code = s.fund_code or ""
+                if not code:
+                    continue
                 save_signal_item(
-                    conn, run_id, fund.code,
+                    conn, run_id, code,
                     s.signal_type.value, s.confidence, s.date,
                 )
                 item_count += 1
+        else:
+            for fund in funds:
+                price_df = fund_prices.get(fund.code)
+                if price_df is None:
+                    continue
+                try:
+                    signals = fn(price_df)
+                except Exception:
+                    continue
+                for s in signals:
+                    save_signal_item(
+                        conn, run_id, fund.code,
+                        s.signal_type.value, s.confidence, s.date,
+                    )
+                    item_count += 1
         runs.append({"strategy": sm.name, "signals": item_count, "status": "completed"})
 
     conn.close()
@@ -343,6 +370,9 @@ async def get_fund_signals(code: str):
         if not enabled.get(sm.name, True):
             continue
         fn = get_strategy(sm.name)
+        # ponytail: multi-fund strategies are bulk-only; skip in per-fund endpoint
+        if getattr(fn, "multi_fund", False):
+            continue
         result = fn(price_df)
         for s in result:
             signals.append(SignalResponse(
