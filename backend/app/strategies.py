@@ -262,11 +262,12 @@ def momentum(funds_data: dict[str, pd.DataFrame], params: dict | None = None) ->
     signals: list[Signal] = []
     for rank, (code, ret, date_str) in enumerate(rankings, start=1):
         signals.append(Signal(
-            date=f"rank_{rank}",
+            date=date_str,
             fund_code=code,
             strategy_name="momentum",
             signal_type=SignalType.hold,
             confidence=round(ret, 6),
+            detail=f"rank_{rank}",
         ))
     return signals
 

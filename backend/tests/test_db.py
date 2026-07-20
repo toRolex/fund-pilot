@@ -160,7 +160,7 @@ class TestQuerySignals:
         init_db(conn)
         assert query_signals(conn, fund_code="nonexistent") == []
 
-    def test_query_orders_by_detail_fund_code(self):
+    def test_query_orders_by_insertion_id(self):
         from app.db import get_connection, init_db, save_signal_run, save_signal_item, query_signals
 
         conn = get_connection()
@@ -171,11 +171,11 @@ class TestQuerySignals:
 
         results = query_signals(conn)
         assert len(results) == 2
-        # Ordered by detail (date) then fund_code
-        assert results[0]["fund_code"] == "000001"
-        assert results[0]["detail"] == "2024-01-15"
-        assert results[1]["fund_code"] == "000002"
-        assert results[1]["detail"] == "2024-01-16"
+        # Ordered by insertion (si.id)
+        assert results[0]["fund_code"] == "000002"
+        assert results[0]["detail"] == "2024-01-16"
+        assert results[1]["fund_code"] == "000001"
+        assert results[1]["detail"] == "2024-01-15"
 
 
 class TestPersistenceAcrossConnections:

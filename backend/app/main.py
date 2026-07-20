@@ -213,7 +213,7 @@ async def get_signals(fund_code: Optional[str] = Query(None)):
                 pass
 
         signals.append(SignalResponse(
-            date=row["detail"],
+            date=row["date"] or row["detail"] or "",
             fund_code=row["fund_code"],
             fund_name=fund_name,
             strategy_name=row["strategy"],
@@ -267,7 +267,7 @@ async def run_signals():
                     continue
                 save_signal_item(
                     conn, run_id, code,
-                    s.signal_type.value, s.confidence, s.date,
+                    s.signal_type.value, s.confidence, s.detail, s.date,
                 )
                 item_count += 1
         else:
@@ -282,7 +282,7 @@ async def run_signals():
                 for s in signals:
                     save_signal_item(
                         conn, run_id, fund.code,
-                        s.signal_type.value, s.confidence, s.date,
+                        s.signal_type.value, s.confidence, s.detail, s.date,
                     )
                     item_count += 1
         runs.append({"strategy": sm.name, "signals": item_count, "status": "completed"})

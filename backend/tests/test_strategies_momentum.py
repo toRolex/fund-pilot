@@ -40,7 +40,7 @@ class TestMomentum:
         }
         signals = momentum(funds, {"n_days": 20})
         assert len(signals) == 2
-        ranks = [s.date for s in signals]
+        ranks = [s.detail for s in signals]
         assert ranks == ["rank_1", "rank_2"]
 
     def test_insufficient_data_partial_skipped(self):
@@ -55,7 +55,7 @@ class TestMomentum:
         signals = momentum(funds, {"n_days": 20})
         assert len(signals) == 1
         assert signals[0].fund_code == "OK"
-        assert signals[0].date == "rank_1"
+        assert signals[0].detail == "rank_1"
 
     def test_empty_input(self):
         from app.strategies import momentum

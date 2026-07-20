@@ -31,6 +31,7 @@ class Signal(BaseModel):
     strategy_name: str
     signal_type: SignalType
     confidence: float = 0.0
+    detail: str = ""
 
 
 class SignalResponse(Signal):

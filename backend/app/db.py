@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS signal_item (
     detail TEXT
 )"""
 
+_ADD_DATE_SQL = "ALTER TABLE signal_item ADD COLUMN date TEXT"
+
 _DB_PATH: str = str(Path(__file__).resolve().parent.parent / "data" / "signals.db")
 
 
@@ -42,6 +44,10 @@ def get_connection() -> sqlite3.Connection:
 def init_db(conn: sqlite3.Connection) -> None:
     conn.execute(_RUN_SQL)
     conn.execute(_ITEM_SQL)
+    try:
+        conn.execute(_ADD_DATE_SQL)
+    except sqlite3.OperationalError:
+        pass  # column already exists
     conn.commit()
 
 
@@ -66,10 +72,11 @@ def save_signal_item(
     signal: str,
     value: float | None = None,
     detail: str | None = None,
+    date: str | None = None,
 ) -> None:
     conn.execute(
-        "INSERT INTO signal_item (run_id, fund_code, signal, value, detail) VALUES (?, ?, ?, ?, ?)",
-        (run_id, fund_code, signal, value, detail),
+        "INSERT INTO signal_item (run_id, fund_code, signal, value, detail, date) VALUES (?, ?, ?, ?, ?, ?)",
+        (run_id, fund_code, signal, value, detail, date),
     )
     conn.commit()
 
@@ -79,7 +86,7 @@ def query_signals(
     fund_code: str | None = None,
 ) -> list[dict]:
     sql = """
-        SELECT si.fund_code, si.signal, si.value, si.detail,
+        SELECT si.fund_code, si.signal, si.value, si.detail, si.date,
                sr.strategy, sr.run_at
         FROM signal_item si
         JOIN signal_run sr ON si.run_id = sr.id
@@ -88,5 +95,5 @@ def query_signals(
     if fund_code:
         sql += " WHERE si.fund_code = ?"
         params.append(fund_code)
-    sql += " ORDER BY si.detail, si.fund_code"
+    sql += " ORDER BY si.id"
     return [dict(r) for r in conn.execute(sql, params).fetchall()]
