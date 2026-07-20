@@ -84,6 +84,40 @@ class TestPostRunSignals:
         for r in data["runs"]:
             assert r["signals"] == 0
 
+    @patch("app.main.load_fund_price")
+    def test_momentum_persists_per_fund_signals(self, mock_load, client):
+        """Momentum is multi-fund: dispatcher passes dict, each fund's rank persisted."""
+        def make_df():
+            return pd.DataFrame({
+                "date": pd.date_range("2024-01-01", periods=30, freq="D"),
+                "netvalue": [1.0 + i * 0.01 for i in range(30)],
+            })
+
+        def make_df_down():
+            return pd.DataFrame({
+                "date": pd.date_range("2024-01-01", periods=30, freq="D"),
+                "netvalue": [1.3 - i * 0.01 for i in range(30)],
+            })
+
+        mock_load.side_effect = lambda code: make_df_down() if code == "110001" else make_df()
+
+        resp = client.post("/api/signals/run")
+        assert resp.status_code == 200
+        runs = {r["strategy"]: r for r in resp.json()["runs"]}
+        assert "momentum" in runs
+        assert runs["momentum"]["signals"] == 2
+
+        from app.db import get_connection, query_signals
+        conn = get_connection()
+        results = query_signals(conn)
+        conn.close()
+        momentum_items = [r for r in results if r["strategy"] == "momentum"]
+        assert len(momentum_items) == 2
+        funds_in_db = {r["fund_code"] for r in momentum_items}
+        assert funds_in_db == {"000001", "110001"}
+        details = sorted([r["detail"] for r in momentum_items])
+        assert details == ["rank_1", "rank_2"]
+
 
 class TestStrategiesEndpoint:
     def test_list_strategies(self, client):
