@@ -5,6 +5,7 @@ import io
 from pathlib import Path
 from typing import List
 
+from app.data import load_fund_price
 from app.models import Holding
 
 # ponytail: global singleton, per-user isolation if needed later
@@ -52,6 +53,23 @@ class HoldingsService:
 
     def list_all(self) -> List[Holding]:
         return sorted(_HOLDINGS.values(), key=lambda h: h.fund_code)
+
+    def refresh_prices(self) -> List[Holding]:
+        """Update current_value for all holdings from latest NAV.
+
+        Falls back gracefully (keeps current value) when price fetch fails.
+        """
+        for h in _HOLDINGS.values():
+            try:
+                df = load_fund_price(h.fund_code)
+                df_sorted = df.sort_values("date")
+                latest_nav = float(df_sorted.iloc[-1]["netvalue"])
+                h.current_value = round(latest_nav, 4)
+            except Exception:
+                # ponytail: keep old value on failure
+                pass
+        _save()
+        return self.list_all()
 
     def import_holdings(self, holdings: List[Holding]):
         _HOLDINGS.clear()

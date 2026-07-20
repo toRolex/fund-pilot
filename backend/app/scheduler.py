@@ -42,7 +42,14 @@ def get_cache() -> dict:
 
 
 def refresh_signals():
-    """Run all strategies against every watchlisted fund, update *cache* in-place."""
+    """Run all strategies against every watchlisted fund, update *cache* in-place.
+
+    Also refreshes holdings prices before computing signals.
+    """
+    # ponytail: holdings refresh in signal cycle, separate schedule if needed
+    from app.holdings import HoldingsService
+    HoldingsService().refresh_prices()
+
     watchlist = WatchlistService()
     funds = watchlist.list_all()
     strategies = list_strategies()
