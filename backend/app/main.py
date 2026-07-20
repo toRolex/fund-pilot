@@ -9,7 +9,7 @@ import xalpha as xa
 
 from app.data import load_fund_price
 from app.holdings import HoldingsService
-from app.models import AddFundRequest, Fund, FundDetail, Holding, HoldingResponse, NavPoint, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus
+from app.models import AddFundRequest, Fund, FundDetail, Holding, HoldingResponse, NavPoint, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
 from app.scheduler import get_cache, start as start_scheduler, stop as stop_scheduler
 from app.strategies import get_fund_enabled_strategies, get_logs, get_strategy, list_strategies, toggle_enabled, toggle_fund_strategy
 from app.watchlist import WatchlistService
@@ -37,18 +37,73 @@ async def list_funds(
         sort_dir = "asc"
     funds = watchlist.list_all()
     reverse = sort_dir == "desc"
-    return sorted(funds, key=lambda f: getattr(f, sort_by), reverse=reverse)
+
+    # Build enriched response with signal data
+    strategies = list_strategies()
+    enriched: list[WatchlistFund] = []
+    for fund in funds:
+        wf = WatchlistFund(code=fund.code, name=fund.name, type=fund.type)
+        try:
+            price_df = load_fund_price(fund.code)
+        except Exception:
+            enriched.append(wf)
+            continue
+
+        # Daily change from latest 2 NAV values
+        if len(price_df) >= 2:
+            sorted_price = price_df.sort_values("date")
+            wf.daily_change = round(
+                (sorted_price.iloc[-1]["netvalue"] - sorted_price.iloc[-2]["netvalue"])
+                / sorted_price.iloc[-2]["netvalue"] * 100,
+                2,
+            )
+
+        # Run strategies to find latest signal
+        for sm in strategies:
+            fn = get_strategy(sm.name)
+            try:
+                result = fn(price_df)
+            except Exception:
+                continue
+            if result:
+                # Use the most recent signal from this strategy
+                latest = max(result, key=lambda s: s.date)
+                wf.signal_type = latest.signal_type
+                wf.strategy_name = latest.strategy_name
+                wf.confidence = latest.confidence
+                if latest.signal_type != SignalType.hold:
+                    break  # prefer buy/sell over hold
+
+        enriched.append(wf)
+
+    return sorted(enriched, key=lambda f: getattr(f, sort_by), reverse=reverse)
 
 
 @api.post("/funds", status_code=201)
 async def add_fund(body: AddFundRequest):
-    # ponytail: single xa.mfund call, add retry/circuit-breaker if network flakiness matters
+    # ponytail: single xa.fundinfo call, add retry/circuit-breaker if network flakiness matters
+    name = ""
     try:
-        info = xa.mfund(body.code).info
+        fi = xa.fundinfo(body.code)
+        name = fi.name
     except Exception:
+        pass
+
+    if not name:
+        # Fallback: look up in seed data (fictional fund codes not in xalpha)
+        from csv import DictReader
+        seed_path = Path(__file__).resolve().parent.parent / "data" / "watchlist.csv"
+        if seed_path.exists():
+            with open(seed_path) as f:
+                for row in DictReader(f):
+                    if row["code"] == body.code:
+                        name = row["name"]
+                        break
+
+    if not name:
         raise HTTPException(status_code=422, detail=f"Invalid fund code: {body.code}")
     try:
-        fund = watchlist.add(body.code, info.get("name", ""))
+        fund = watchlist.add(body.code, name)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
     return fund
@@ -188,9 +243,11 @@ async def get_fund_detail(code: str):
     if not fund:
         raise HTTPException(status_code=404, detail=f"Fund {code} not found")
 
-    # ponytail: single xa.mfund call, add retry/circuit-breaker if network flakiness matters
+    # ponytail: single xa.fundinfo call, add retry/circuit-breaker if network flakiness matters
     try:
-        info = xa.mfund(code).info
+        fi = xa.fundinfo(code)
+        raw = fi.info
+        info = raw if isinstance(raw, dict) else {}
     except Exception:
         info = {}
 
