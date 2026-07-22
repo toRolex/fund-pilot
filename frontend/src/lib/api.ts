@@ -49,7 +49,7 @@ export const api = {
   removeFund: (code: string) => requestDel(`/funds/${code}`),
   searchFunds: (q: string) => request<SearchResult[]>(`/funds/search?q=${encodeURIComponent(q)}`),
   getSignals: (code?: string) =>
-    request<SignalResponse[]>(`/signals${code ? `?code=${code}` : ""}`),
+    request<SignalResponse[]>(`/signals${code ? `?fund_code=${code}` : ""}`),
   getStrategies: () => request<StrategyPlugin[]>("/strategies"),
   toggleStrategy: (name: string, enabled: boolean) =>
     requestPUT<StrategyPlugin>(`/strategies/${encodeURIComponent(name)}`, { enabled }),
