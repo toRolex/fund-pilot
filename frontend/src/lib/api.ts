@@ -1,4 +1,4 @@
-import type { Fund, FundDetail, HoldingResponse, NavPoint, SearchResult, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
+import type { Fund, FundDetail, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
 
 const BASE = "/api";
 
@@ -68,4 +68,5 @@ export const api = {
   importHoldings: (body: unknown) => requestJSON<{ imported: number }>("/holdings/import", body),
   importHoldingsFormData: (formData: FormData) =>
     requestFormData<{ imported: number }>("/holdings/import", formData),
+  getQdiiPredict: (code: string) => request<QdiiPredictResponse>(`/qdii/${code}`),
 };
