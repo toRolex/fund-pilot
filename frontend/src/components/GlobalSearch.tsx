@@ -1,19 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Search, X } from "lucide-react";
+import { api } from "@/lib/api";
 import type { SearchResult } from "@/types";
-
-const BASE = "/api";
-
-async function fetchJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
 
 export function GlobalSearch() {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -21,30 +15,33 @@ export function GlobalSearch() {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const navigate = useNavigate();
 
-  // Debounced search
+  // Debounce query for search trigger
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!query.trim()) {
-      setResults([]);
+      setDebouncedQuery("");
       setIsOpen(false);
       return;
     }
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const data = await fetchJSON<SearchResult[]>(
-          `/funds/search?q=${encodeURIComponent(query)}`,
-        );
-        setResults(data);
-        setIsOpen(true);
-        setSelectedIndex(-1);
-      } catch {
-        setResults([]);
-      }
-    }, 300);
+    debounceRef.current = setTimeout(() => setDebouncedQuery(query), 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query]);
+
+  const { data: results = [] } = useQuery<SearchResult[]>({
+    queryKey: ["global-search", debouncedQuery],
+    queryFn: () => api.searchFunds(debouncedQuery),
+    enabled: debouncedQuery.length > 0,
+  });
+
+  // Open dropdown when results arrive from a fresh search
+  useEffect(() => {
+    if (debouncedQuery) {
+      setIsOpen(true);
+      setSelectedIndex(-1);
+    }
+  }, [debouncedQuery, results]);
 
   // Close on outside click
   const handleOutsideClick = useCallback((e: MouseEvent) => {
@@ -105,7 +102,7 @@ export function GlobalSearch() {
           <button
             onClick={() => {
               setQuery("");
-              setResults([]);
+              setDebouncedQuery("");
               setIsOpen(false);
             }}
             aria-label="清除搜索"
@@ -115,7 +112,7 @@ export function GlobalSearch() {
         )}
       </div>
 
-      {isOpen && (
+      {isOpen && debouncedQuery && (
         <div className="absolute z-50 top-full mt-1 w-full bg-surface border border-gray-700 shadow-lg max-h-64 overflow-y-auto">
           {results.length === 0 ? (
             <div className="p-3 text-gray-500 text-sm text-center">

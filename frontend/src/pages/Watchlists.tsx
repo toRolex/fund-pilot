@@ -2,13 +2,12 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Plus, X } from "lucide-react";
 import type { SignalType, Fund } from "@/types";
+import { api } from "@/lib/api";
 import { SignalBadge } from "./SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
 import { ErrorState } from "@/components/ErrorState";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
-
-const BASE = "/api";
 
 interface WatchlistItem {
   code: string;
@@ -17,12 +16,6 @@ interface WatchlistItem {
   signal_type: SignalType;
   strategy_name: string;
   confidence: number;
-}
-
-async function fetchJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
 }
 
 export function Watchlists() {
@@ -37,14 +30,11 @@ export function Watchlists() {
 
   const { data: items, isLoading, isError, refetch } = useQuery<WatchlistItem[]>({
     queryKey: ["watchlist"],
-    queryFn: () => fetchJSON<WatchlistItem[]>("/funds"),
+    queryFn: () => api.getFunds() as Promise<WatchlistItem[]>,
   });
 
   const removeMutation = useMutation({
-    mutationFn: (code: string) =>
-      fetch(`${BASE}/funds/${code}`, { method: "DELETE" }).then((r) => {
-        if (!r.ok) throw new Error("Delete failed");
-      }),
+    mutationFn: (code: string) => api.removeFund(code),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["watchlist"] });
       setRemoveConfirm(null);
@@ -61,7 +51,7 @@ export function Watchlists() {
     }
     debounceRef.current = setTimeout(async () => {
       try {
-        const results = await fetchJSON<Fund[]>(`/funds/search?q=${encodeURIComponent(value)}`);
+        const results = await api.searchFunds(value);
         setAddResults(results);
       } catch {
         setAddResults([]);
@@ -82,11 +72,7 @@ export function Watchlists() {
 
   const handleAddFund = async (code: string) => {
     try {
-      await fetch(`${BASE}/funds`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
+      await api.addFund(code);
       queryClient.invalidateQueries({ queryKey: ["watchlist"] });
       setAddSearch("");
       setAddResults([]);

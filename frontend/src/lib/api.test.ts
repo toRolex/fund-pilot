@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { api } from "../lib/api";
 
 describe("api client", () => {
@@ -40,5 +40,29 @@ describe("api client", () => {
   it("has getStatus", () => {
     expect(api.getStatus).toBeDefined();
     expect(typeof api.getStatus).toBe("function");
+  });
+
+  describe("importHoldingsFormData", () => {
+    it("sends FormData with no explicit Content-Type header", async () => {
+      const fd = new FormData();
+      fd.append("file", new Blob(["a,b\n1,2"]), "test.csv");
+      const fetchMock = vi.spyOn(window, "fetch").mockResolvedValue(
+        new Response(JSON.stringify({ imported: 3 }), { status: 200 }),
+      );
+
+      const result = await api.importHoldingsFormData(fd);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/holdings/import",
+        expect.objectContaining({
+          method: "POST",
+          body: fd,
+        }),
+      );
+      // ponytail: headers can be undefined or an object without Content-Type
+      const callArgs = fetchMock.mock.calls[0][1] as RequestInit;
+      expect(callArgs.headers).toBeUndefined();
+      expect(result).toEqual({ imported: 3 });
+    });
   });
 });
