@@ -63,10 +63,12 @@ def e2e_state(tmp_path):
 class TestEndToEndWorkflow:
     """Verify the full workflow from adding a fund to querying QDII predictions."""
 
-    @patch("app.holdings.load_fund_price")
-    @patch("app.main.xa")
+    # ponytail: from-import rebinds in app.holdings / app.main, patch all three call sites
     @patch("app.main.load_fund_price")
-    def test_full_workflow(self, mock_load, mock_xa, mock_holdings_load, client, e2e_state):
+    @patch("app.holdings.load_fund_price")
+    @patch("app.data.load_fund_price")
+    @patch("app.main.xa")
+    def test_full_workflow(self, mock_xa, mock_data_load, mock_holdings_load, mock_main_load, client, e2e_state):
         """Run the complete user workflow and verify each step's outcome."""
 
         # 1. Add a real fund (mock xalpha so no network call).
@@ -81,7 +83,9 @@ class TestEndToEndWorkflow:
         mock_xa.fundinfo.return_value = mock_fund
 
         # Mock price data for the new fund: uptrend to trigger buy signals.
-        mock_load.return_value = _uptrend_df()
+        mock_data_load.return_value = _uptrend_df()
+        mock_holdings_load.return_value = _uptrend_df()
+        mock_main_load.return_value = _uptrend_df()
 
         resp = client.post("/api/funds", json={"code": "000001"})
         assert resp.status_code == 201, resp.text
@@ -198,10 +202,12 @@ class TestEndToEndWorkflow:
         # xalpha.QDIIPredict was actually invoked
         mock_xa.QDIIPredict.assert_called_with("SH501018")
 
-    @patch("app.holdings.load_fund_price")
-    @patch("app.main.xa")
+    # ponytail: from-import rebinds in app.holdings / app.main, patch all three call sites
     @patch("app.main.load_fund_price")
-    def test_multi_fund_workflow(self, mock_load, mock_xa, mock_holdings_load, client, e2e_state):
+    @patch("app.holdings.load_fund_price")
+    @patch("app.data.load_fund_price")
+    @patch("app.main.xa")
+    def test_multi_fund_workflow(self, mock_xa, mock_data_load, mock_holdings_load, mock_main_load, client, e2e_state):
         """E2E with multiple funds: watchlist expansion + multi-fund momentum."""
         # Mock xalpha for fund info lookups
         fund_names = {
@@ -221,7 +227,9 @@ class TestEndToEndWorkflow:
         def load_side_effect(code):
             return _downtrend_df() if code == "110001" else _uptrend_df()
 
-        mock_load.side_effect = load_side_effect
+        mock_data_load.side_effect = load_side_effect
+        mock_holdings_load.side_effect = load_side_effect
+        mock_main_load.side_effect = load_side_effect
 
         # Add both funds
         for code in ("000001", "110001"):
@@ -275,10 +283,11 @@ class TestEndToEndWorkflow:
         assert refreshed["000001"]["current_value"] == 1.50
         assert refreshed["110001"]["current_value"] == 2.20
 
-    @patch("app.main.xa")
     @patch("app.main.load_fund_price")
+    @patch("app.data.load_fund_price")
+    @patch("app.main.xa")
     def test_qdii_failure_does_not_break_other_flows(
-        self, mock_load, mock_xa, client, e2e_state
+        self, mock_xa, mock_data_load, mock_main_load, client, e2e_state
     ):
         """A QDII failure is isolated — does not corrupt watchlist/signals/holdings."""
         # Add a fund and run signals first
@@ -286,7 +295,8 @@ class TestEndToEndWorkflow:
         mock_fund.name = "测试基金"
         mock_fund.info = {}
         mock_xa.fundinfo.return_value = mock_fund
-        mock_load.return_value = _uptrend_df()
+        mock_data_load.return_value = _uptrend_df()
+        mock_main_load.return_value = _uptrend_df()
 
         client.post("/api/funds", json={"code": "000001"})
         client.post("/api/signals/run")
