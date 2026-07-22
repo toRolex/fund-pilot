@@ -10,7 +10,7 @@ from typing import Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from app.data import load_fund_price
+from app.data import load_all_prices
 from app.strategies import list_strategies
 from app.watchlist import WatchlistService
 
@@ -49,6 +49,7 @@ def refresh_signals():
     from app.holdings import HoldingsService
 
     from app.db import get_connection as get_db_connection, init_db
+    from app.signal_service import run_signals as execute_signals
 
     HoldingsService().refresh_prices()
 
@@ -60,14 +61,7 @@ def refresh_signals():
     init_db(conn)
 
     # Pre-load all fund prices once
-    fund_prices: dict[str, object] = {}
-    for fund in funds:
-        try:
-            fund_prices[fund.code] = load_fund_price(fund.code)
-        except Exception:
-            continue
-
-    from app.signal_service import run_signals as execute_signals
+    fund_prices = load_all_prices(funds)
 
     execute_signals(conn, strategies, funds, fund_prices)
     conn.close()

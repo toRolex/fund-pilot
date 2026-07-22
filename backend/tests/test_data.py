@@ -62,3 +62,50 @@ def test_load_fund_price_propagates_error():
         mock_xa.fundinfo.side_effect = ValueError("network error")
         with pytest.raises(ValueError, match="Failed to load price data"):
             load_fund_price("000001")
+
+
+class TestLoadAllPrices:
+    def test_returns_prices_for_funds(self):
+        from app.data import load_all_prices
+
+        funds = [type("Fund", (), {"code": "000001"})(), type("Fund", (), {"code": "000002"})()]
+        mock_price = pd.DataFrame({
+            "date": pd.date_range("2024-01-01", periods=3, freq="D"),
+            "netvalue": [1.0, 1.1, 1.2],
+        })
+        mock_info = MagicMock()
+        mock_info.price = mock_price
+
+        with patch("app.data.xa") as mock_xa:
+            mock_xa.fundinfo.return_value = mock_info
+            result = load_all_prices(funds)
+
+        assert set(result.keys()) == {"000001", "000002"}
+        assert all(isinstance(v, pd.DataFrame) for v in result.values())
+
+    def test_skips_failed_funds(self):
+        from app.data import load_all_prices
+
+        funds = [type("Fund", (), {"code": "000001"})(), type("Fund", (), {"code": "000002"})()]
+
+        def mock_fundinfo(code):
+            if code == "000002":
+                raise ValueError("fail")
+            info = MagicMock()
+            info.price = pd.DataFrame({
+                "date": pd.date_range("2024-01-01", periods=2, freq="D"),
+                "netvalue": [1.0, 1.1],
+            })
+            return info
+
+        with patch("app.data.xa") as mock_xa:
+            mock_xa.fundinfo.side_effect = mock_fundinfo
+            result = load_all_prices(funds)
+
+        assert list(result.keys()) == ["000001"]
+
+    def test_empty_funds_returns_empty(self):
+        from app.data import load_all_prices
+
+        result = load_all_prices([])
+        assert result == {}

@@ -1,5 +1,6 @@
 """xalpha data loading and local CSV fallback."""
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import xalpha as xa
@@ -30,3 +31,18 @@ def load_fund_price(code: str) -> pd.DataFrame:
         return df
 
     raise ValueError(f"Failed to load price data for {code}")
+
+
+def load_all_prices(funds: list[Any]) -> dict[str, pd.DataFrame]:
+    """Pre-load fund prices for a list of watchlist funds.
+
+    Returns ``{fund_code: DataFrame}``, skipping any fund whose price
+    data fails to load.
+    """
+    prices: dict[str, pd.DataFrame] = {}
+    for fund in funds:
+        try:
+            prices[fund.code] = load_fund_price(fund.code)
+        except Exception:
+            continue
+    return prices

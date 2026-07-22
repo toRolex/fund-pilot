@@ -82,7 +82,7 @@ class TestPostRunSignals:
         assert data["status"] == "completed"
         # Strategies still produce 0-signal runs
         for r in data["runs"]:
-            assert r["signals"] == 0
+            assert r["signal_count"] == 0
 
     @patch("app.main.load_fund_price")
     def test_momentum_persists_per_fund_signals(self, mock_load, client):
@@ -105,7 +105,7 @@ class TestPostRunSignals:
         assert resp.status_code == 200
         runs = {r["strategy"]: r for r in resp.json()["runs"]}
         assert "momentum" in runs
-        assert runs["momentum"]["signals"] == 2
+        assert runs["momentum"]["signal_count"] == 2
 
         from app.db import get_connection, query_signals
         conn = get_connection()

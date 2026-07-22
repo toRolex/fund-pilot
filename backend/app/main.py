@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 import xalpha as xa
 
-from app.data import load_fund_price
+from app.data import load_all_prices, load_fund_price
 from app.db import get_connection as get_db_connection, init_db, query_signals
 from app.holdings import HoldingsService
 from app.models import AddFundRequest, Fund, FundDetail, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
@@ -240,18 +240,13 @@ async def run_signals():
     strategies_list = list_strategies()
 
     # Pre-load all fund prices once for multi-fund strategies
-    fund_prices: dict[str, object] = {}
-    for fund in funds:
-        try:
-            fund_prices[fund.code] = load_fund_price(fund.code)
-        except Exception:
-            continue
+    fund_prices = load_all_prices(funds)
 
     runs = execute_signals(conn, strategies_list, funds, fund_prices)
     conn.close()
     return {
         "status": "completed",
-        "runs": [{"strategy": k, "signals": v, "status": "completed"} for k, v in runs.items()],
+        "runs": [{"strategy": k, "signal_count": v, "status": "completed"} for k, v in runs.items()],
     }
 
 
