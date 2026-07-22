@@ -182,6 +182,26 @@ class TestSignalsEndpoint:
         for s in data:
             assert s["fund_code"] == "000001"
 
+    def test_filter_by_strategy(self, client):
+        """GET /api/signals?strategy=X must filter signal items to that strategy."""
+        with patch("app.main.load_fund_price") as mock_load:
+            mock_price = pd.DataFrame({
+                "date": pd.date_range("2024-01-01", periods=50, freq="D"),
+                "netvalue": [1.0] * 25 + [1.0 + i * 0.02 for i in range(25)],
+            })
+            mock_load.return_value = mock_price
+            client.post("/api/signals/run")
+
+        resp = client.get("/api/signals?strategy=indicator_cross")
+        assert resp.status_code == 200
+        data = resp.json()
+        for s in data:
+            assert s["strategy_name"] == "indicator_cross"
+
+        resp = client.get("/api/signals?strategy=nonexistent_strategy")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
     def test_filter_nonexistent_fund_code(self, client):
         self._populate_db(client)
         resp = client.get("/api/signals?fund_code=nonexistent")
