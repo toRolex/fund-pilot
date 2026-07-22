@@ -1,44 +1,17 @@
 import { useParams } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
-import { api } from "@/lib/api";
-import { SignalBadge, SignalBuyMarker, SignalSellMarker, SignalHoldMarker } from "./SignalBadge";
+import { SignalBadge, SignalBuyMarker, SignalSellMarker, SignalHoldMarker } from "@/components/SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
 import { ErrorState } from "@/components/ErrorState";
-import type { NavPoint, SignalResponse, SignalType, FundDetail as FundDetailType } from "@/types";
+import type { NavPoint, SignalResponse, SignalType } from "@/types";
 import { useMemo } from "react";
-
-function useFundDetail(code: string) {
-  return useQuery({
-    queryKey: ["fund", code],
-    queryFn: () => api.getFundDetail(code),
-    enabled: !!code,
-  });
-}
-
-function useFundNav(code: string) {
-  return useQuery({
-    queryKey: ["fund-nav", code],
-    queryFn: () => api.getFundNav(code),
-    enabled: !!code,
-  });
-}
-
-function useFundSignals(code: string) {
-  return useQuery({
-    queryKey: ["fund-signals", code],
-    queryFn: () => api.getFundSignals(code),
-    enabled: !!code,
-  });
-}
-
-function useFundStrategies(code: string) {
-  return useQuery({
-    queryKey: ["fund-strategies", code],
-    queryFn: () => api.getFundStrategies(code),
-    enabled: !!code,
-  });
-}
+import {
+  useFundDetail,
+  useFundNav,
+  useFundSignals,
+  useFundStrategies,
+  useToggleFundStrategy,
+} from "@/hooks/useFund";
 
 function LoadingSkeleton() {
   return (
@@ -59,12 +32,6 @@ function round(v: number, decimals: number): number {
   const f = Math.pow(10, decimals);
   return Math.round(v * f) / f;
 }
-
-const SIGNAL_COLORS: Record<SignalType, string> = {
-  buy: "#34d399",
-  sell: "#fb923c",
-  hold: "#facc15",
-};
 
 // ── SVG Chart ──────────────────────────────────────────────────────────────
 const CHART_W = 700;
@@ -259,15 +226,8 @@ function SignalTable({ signals }: { signals: SignalResponse[] }) {
 
 // ── Strategy Sidebar (CSS toggle) ────────────────────────────────────────────
 function StrategiesSidebar({ code }: { code: string }) {
-  const queryClient = useQueryClient();
   const { data: strategies, isLoading } = useFundStrategies(code);
-
-  const toggleMutation = useMutation({
-    mutationFn: (name: string) => api.toggleFundStrategy(code, name),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fund-strategies", code] });
-    },
-  });
+  const toggleMutation = useToggleFundStrategy(code);
 
   if (isLoading) {
     return (

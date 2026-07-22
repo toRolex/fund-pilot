@@ -1,10 +1,10 @@
 import { useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Upload, Download } from "lucide-react";
 import { api } from "@/lib/api";
+import { useHoldings } from "@/hooks/useHoldings";
 import { ErrorState } from "@/components/ErrorState";
 import { EmptyState } from "@/components/EmptyState";
-import type { HoldingResponse } from "@/types";
 
 function LoadingSkeleton() {
   return (
@@ -39,21 +39,7 @@ export function Holdings() {
     isLoading,
     isError,
     refetch,
-  } = useQuery<HoldingResponse[]>({
-    queryKey: ["holdings"],
-    queryFn: () => api.getHoldings(),
-  });
-
-  const importMutation = useMutation({
-    mutationFn: (body: unknown) => api.importHoldings(body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["holdings"] });
-      setImportError(null);
-    },
-    onError: (err: Error) => {
-      setImportError(`导入失败: ${err.message}`);
-    },
-  });
+  } = useHoldings();
 
   const handleFileSelect = () => {
     fileInputRef.current?.click();

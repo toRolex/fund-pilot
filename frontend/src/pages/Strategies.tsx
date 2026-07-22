@@ -1,5 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { useStrategies, useStrategyLogs, useToggleStrategy } from "@/hooks/useStrategies";
 import type { StrategyPlugin } from "@/types";
 
 function StrategyCard({
@@ -64,27 +63,9 @@ function StrategyCard({
 }
 
 export function Strategies() {
-  const queryClient = useQueryClient();
-
-  const { data: strategies, isLoading, isError, refetch } = useQuery({
-    queryKey: ["strategies"],
-    queryFn: () => api.getStrategies(),
-  });
-
-  const { data: logs } = useQuery({
-    queryKey: ["strategy-logs"],
-    queryFn: () => api.getStrategyLogs(),
-    refetchInterval: 10_000,
-  });
-
-  const toggleMutation = useMutation({
-    mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
-      api.toggleStrategy(name, enabled),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["strategies"] });
-      queryClient.invalidateQueries({ queryKey: ["strategy-logs"] });
-    },
-  });
+  const { data: strategies, isLoading, isError, refetch } = useStrategies();
+  const { data: logs } = useStrategyLogs();
+  const toggleMutation = useToggleStrategy();
 
   if (isLoading) {
     return (

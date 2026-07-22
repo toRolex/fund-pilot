@@ -1,63 +1,28 @@
-import { useState, useCallback, useRef, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, useRef } from "react";
 import { Search, Plus, X } from "lucide-react";
-import type { SignalType, Fund } from "@/types";
-import { api } from "@/lib/api";
-import { SignalBadge } from "./SignalBadge";
+import { SignalBadge } from "@/components/SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
 import { ErrorState } from "@/components/ErrorState";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
-
-interface WatchlistItem {
-  code: string;
-  name: string;
-  daily_change: number;
-  signal_type: SignalType;
-  strategy_name: string;
-  confidence: number;
-}
+import { useWatchlist, useAddFund, useRemoveFund } from "@/hooks/useWatchlist";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useFundSearch } from "@/hooks/useFundSearch";
 
 export function Watchlists() {
-  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [addSearch, setAddSearch] = useState("");
   const [showAddPanel, setShowAddPanel] = useState(false);
-  const [addResults, setAddResults] = useState<Fund[]>([]);
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
   const addPanelRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const { data: items, isLoading, isError, refetch } = useQuery<WatchlistItem[]>({
-    queryKey: ["watchlist"],
-    queryFn: () => api.getFunds() as Promise<WatchlistItem[]>,
-  });
+  const { data: items, isLoading, isError, refetch } = useWatchlist();
+  const removeMutation = useRemoveFund();
+  const addMutation = useAddFund();
 
-  const removeMutation = useMutation({
-    mutationFn: (code: string) => api.removeFund(code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["watchlist"] });
-      setRemoveConfirm(null);
-    },
-  });
-
-  // Add search with debounce
-  const handleAddSearchInput = useCallback((value: string) => {
-    setAddSearch(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!value.trim()) {
-      setAddResults([]);
-      return;
-    }
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const results = await api.searchFunds(value);
-        setAddResults(results);
-      } catch {
-        setAddResults([]);
-      }
-    }, 300);
-  }, []);
+  const debouncedAddSearch = useDebouncedValue(addSearch, 300);
+  const trimmedAddSearch = debouncedAddSearch.trim();
+  const { data: addResults = [] } = useFundSearch(trimmedAddSearch);
 
   // Close add panel on click outside
   useEffect(() => {
@@ -70,16 +35,13 @@ export function Watchlists() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const handleAddFund = async (code: string) => {
-    try {
-      await api.addFund(code);
-      queryClient.invalidateQueries({ queryKey: ["watchlist"] });
-      setAddSearch("");
-      setAddResults([]);
-      setShowAddPanel(false);
-    } catch {
-      // ponytail: toast/snackbar if UX requires it
-    }
+  const handleAddFund = (code: string) => {
+    addMutation.mutate(code, {
+      onSuccess: () => {
+        setAddSearch("");
+        setShowAddPanel(false);
+      },
+    });
   };
 
   const safeItems = items ?? [];
@@ -128,14 +90,13 @@ export function Watchlists() {
               className="flex-1 bg-transparent text-[var(--fg)] outline-none text-xs placeholder:text-[var(--muted)] font-mono"
               placeholder="搜索基金代码或名称..."
               value={addSearch}
-              onChange={(e) => handleAddSearchInput(e.target.value)}
+              onChange={(e) => setAddSearch(e.target.value)}
               autoFocus
             />
             {addSearch && (
               <button
                 onClick={() => {
                   setAddSearch("");
-                  setAddResults([]);
                 }}
               >
                 <X size={14} className="text-[var(--muted)]" />
@@ -221,7 +182,11 @@ export function Watchlists() {
                         <span className="text-xs text-[var(--fg-2)]">确认删除？</span>
                         <button
                           className="px-2 py-1 text-xs bg-red-500 text-white hover:bg-red-600"
-                          onClick={() => removeMutation.mutate(item.code)}
+                          onClick={() => {
+                            removeMutation.mutate(item.code, {
+                              onSuccess: () => setRemoveConfirm(null),
+                            });
+                          }}
                           disabled={removeMutation.isPending}
                         >
                           确认

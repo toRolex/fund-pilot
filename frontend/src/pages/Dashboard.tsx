@@ -1,21 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { SignalBadge } from "./SignalBadge";
+import { SignalBadge } from "@/components/SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
 import { ErrorState } from "@/components/ErrorState";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/TableSkeleton";
+import { useSignals } from "@/hooks/useSignals";
 
 type SortKey = "fund_code" | "fund_name" | "signal_type" | "confidence" | "daily_change";
-
-function useSignals() {
-  return useQuery({
-    queryKey: ["signals"],
-    queryFn: () => api.getSignals(),
-  });
-}
 
 export function Dashboard() {
   const { data: signals, isLoading, isError, refetch } = useSignals();
