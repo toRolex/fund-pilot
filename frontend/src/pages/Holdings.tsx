@@ -71,14 +71,7 @@ export function Holdings() {
       const formData = new FormData();
       formData.append("file", file);
       try {
-        const res = await fetch("/api/holdings/import", {
-          method: "POST",
-          body: formData,
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ detail: "Import failed" }));
-          throw new Error(err.detail || "Import failed");
-        }
+        await api.importHoldingsFormData(formData);
         queryClient.invalidateQueries({ queryKey: ["holdings"] });
         setImportError(null);
       } catch (err: unknown) {

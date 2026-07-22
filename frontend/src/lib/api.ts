@@ -28,6 +28,12 @@ async function requestPUT<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+async function requestFormData<T>(path: string, body: FormData): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { method: "POST", body });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 async function requestDel(path: string): Promise<void> {
   const res = await fetch(`${BASE}${path}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -60,4 +66,6 @@ export const api = {
     ),
   getHoldings: () => request<HoldingResponse[]>("/holdings"),
   importHoldings: (body: unknown) => requestJSON<{ imported: number }>("/holdings/import", body),
+  importHoldingsFormData: (formData: FormData) =>
+    requestFormData<{ imported: number }>("/holdings/import", formData),
 };
