@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 import xalpha as xa
 
 from app.data import load_fund_price
-from app.db import get_connection as get_db_connection, init_db, query_signals, save_signal_item, save_signal_run
+from app.db import get_connection as get_db_connection, init_db, query_signals
 from app.holdings import HoldingsService
 from app.models import AddFundRequest, Fund, FundDetail, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
 from app.scheduler import get_cache, start as start_scheduler, stop as stop_scheduler
@@ -232,14 +232,12 @@ async def get_signals(
 @api.post("/signals/run")
 async def run_signals():
     """Run all strategies against watchlist funds and persist results to SQLite."""
-    from datetime import datetime
-
-    from app.strategies import get_strategy
+    from app.signal_service import run_signals as execute_signals
 
     conn = get_db_connection()
     init_db(conn)
     funds = watchlist.list_all()
-    strategies = list_strategies()
+    strategies_list = list_strategies()
 
     # Pre-load all fund prices once for multi-fund strategies
     fund_prices: dict[str, object] = {}
@@ -249,50 +247,12 @@ async def run_signals():
         except Exception:
             continue
 
-    runs = []
-    for sm in strategies:
-        now = datetime.now().isoformat()
-        run_id = save_signal_run(conn, sm.name, now)
-        fn = get_strategy(sm.name)
-        item_count = 0
-        # ponytail: multi-fund strategies get the dict; per-fund strategies loop as before
-        if getattr(fn, "multi_fund", False):
-            if not fund_prices:
-                runs.append({"strategy": sm.name, "signals": 0, "status": "completed"})
-                continue
-            try:
-                signals = fn(fund_prices)
-            except Exception:
-                runs.append({"strategy": sm.name, "signals": 0, "status": "completed"})
-                continue
-            for s in signals:
-                code = s.fund_code or ""
-                if not code:
-                    continue
-                save_signal_item(
-                    conn, run_id, code,
-                    s.signal_type.value, s.confidence, s.detail, s.date,
-                )
-                item_count += 1
-        else:
-            for fund in funds:
-                price_df = fund_prices.get(fund.code)
-                if price_df is None:
-                    continue
-                try:
-                    signals = fn(price_df)
-                except Exception:
-                    continue
-                for s in signals:
-                    save_signal_item(
-                        conn, run_id, fund.code,
-                        s.signal_type.value, s.confidence, s.detail, s.date,
-                    )
-                    item_count += 1
-        runs.append({"strategy": sm.name, "signals": item_count, "status": "completed"})
-
+    runs = execute_signals(conn, strategies_list, funds, fund_prices)
     conn.close()
-    return {"status": "completed", "runs": runs}
+    return {
+        "status": "completed",
+        "runs": [{"strategy": k, "signals": v, "status": "completed"} for k, v in runs.items()],
+    }
 
 
 @api.get("/funds/{code}")
