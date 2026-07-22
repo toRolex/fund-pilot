@@ -9,6 +9,7 @@ import xalpha as xa
 
 from app.data import load_all_prices, load_fund_price
 from app.db import get_connection as get_db_connection, init_db, query_signals
+from app.fund_service import compute_daily_change, compute_holding_pl
 from app.holdings import HoldingsService
 from app.models import AddFundRequest, Fund, FundDetail, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
 from app.scheduler import get_cache, start as start_scheduler, stop as stop_scheduler
@@ -51,13 +52,7 @@ async def list_funds(
             continue
 
         # Daily change from latest 2 NAV values
-        if len(price_df) >= 2:
-            sorted_price = price_df.sort_values("date")
-            wf.daily_change = round(
-                (sorted_price.iloc[-1]["netvalue"] - sorted_price.iloc[-2]["netvalue"])
-                / sorted_price.iloc[-2]["netvalue"] * 100,
-                2,
-            )
+        wf.daily_change = compute_daily_change(price_df)
 
         # Run strategies to find latest signal
         for sm in strategies:
@@ -206,13 +201,7 @@ async def get_signals(
         if fund:
             try:
                 price_df = load_fund_price(fund.code)
-                if len(price_df) >= 2:
-                    sorted_price = price_df.sort_values("date")
-                    daily_change = round(
-                        (sorted_price.iloc[-1]["netvalue"] - sorted_price.iloc[-2]["netvalue"])
-                        / sorted_price.iloc[-2]["netvalue"] * 100,
-                        2,
-                    )
+                daily_change = compute_daily_change(price_df)
             except Exception:
                 pass
 
@@ -269,7 +258,6 @@ async def get_fund_detail(code: str):
 
     latest_nav = 0.0
     latest_nav_date = None
-    daily_change = 0.0
 
     if len(price_df) > 0:
         sorted_price = price_df.sort_values("date")
@@ -278,10 +266,7 @@ async def get_fund_detail(code: str):
         raw_date = latest_row["date"]
         latest_nav_date = raw_date.strftime("%Y-%m-%d") if hasattr(raw_date, "strftime") else str(raw_date)
 
-        if len(price_df) >= 2:
-            prev_row = sorted_price.iloc[-2]
-            prev_nav = float(prev_row["netvalue"])
-            daily_change = round((latest_nav - prev_nav) / prev_nav * 100, 2) if prev_nav != 0 else 0.0
+    daily_change = compute_daily_change(price_df)
 
     return FundDetail(
         code=fund.code,
@@ -303,14 +288,7 @@ async def get_fund_signals(code: str):
         raise HTTPException(status_code=404, detail=f"Fund {code} not found")
 
     price_df = load_fund_price(code)
-    daily_change = 0.0
-    if len(price_df) >= 2:
-        sorted_price = price_df.sort_values("date")
-        daily_change = round(
-            (sorted_price.iloc[-1]["netvalue"] - sorted_price.iloc[-2]["netvalue"])
-            / sorted_price.iloc[-2]["netvalue"] * 100,
-            2,
-        )
+    daily_change = compute_daily_change(price_df)
 
     signals: list[SignalResponse] = []
     enabled = get_fund_enabled_strategies(code)
@@ -419,20 +397,14 @@ async def list_holdings():
 
     result = []
     for h in holdings:
-        cost_basis = h.shares * h.cost_price
-        current_total = h.shares * h.current_value
-        pl_amount = current_total - cost_basis
-        pl_percent = (pl_amount / cost_basis * 100) if cost_basis > 0 else 0.0
-
+        pl = compute_holding_pl(h)
         result.append(HoldingResponse(
             fund_code=h.fund_code,
             fund_name=h.fund_name,
             shares=h.shares,
             cost_price=h.cost_price,
             current_value=h.current_value,
-            cost_basis=round(cost_basis, 4),
-            pl_amount=round(pl_amount, 4),
-            pl_percent=round(pl_percent, 4),
+            **pl,
             has_signal=h.fund_code in active_codes,
         ))
 
@@ -509,37 +481,7 @@ async def import_holdings(request: Request):
 async def refresh_holdings():
     """Refresh current_value for all holdings from latest NAV."""
     holdings_service.refresh_prices()
-    holdings = holdings_service.list_all()
-    if not holdings:
-        return []
-    return _build_holding_responses(holdings)
-
-
-def _build_holding_responses(holdings: list[Holding]) -> list[HoldingResponse]:
-    """Build HoldingResponse list with P&L and signal enrichment.
-
-    ponytail: inlined rather than refactored into GET /holdings to keep that
-    handler's diff zero.  Merge into list_holdings when touching that code next.
-    """
-    active_codes = _compute_holdings_signal_codes(holdings)
-    result = []
-    for h in holdings:
-        cost_basis = h.shares * h.cost_price
-        current_total = h.shares * h.current_value
-        pl_amount = current_total - cost_basis
-        pl_percent = (pl_amount / cost_basis * 100) if cost_basis > 0 else 0.0
-        result.append(HoldingResponse(
-            fund_code=h.fund_code,
-            fund_name=h.fund_name,
-            shares=h.shares,
-            cost_price=h.cost_price,
-            current_value=h.current_value,
-            cost_basis=round(cost_basis, 4),
-            pl_amount=round(pl_amount, 4),
-            pl_percent=round(pl_percent, 4),
-            has_signal=h.fund_code in active_codes,
-        ))
-    return result
+    return await list_holdings()
 
 
 # Main app — mounts API and SPA
