@@ -1,47 +1,28 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { Search, X } from "lucide-react";
-import { api } from "@/lib/api";
-import type { SearchResult } from "@/types";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useFundSearch } from "@/hooks/useFundSearch";
 
 export function GlobalSearch() {
   const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const navigate = useNavigate();
 
-  // Debounce query for search trigger
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) {
-      setDebouncedQuery("");
-      setIsOpen(false);
-      return;
-    }
-    debounceRef.current = setTimeout(() => setDebouncedQuery(query), 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query]);
-
-  const { data: results = [] } = useQuery<SearchResult[]>({
-    queryKey: ["global-search", debouncedQuery],
-    queryFn: () => api.searchFunds(debouncedQuery),
-    enabled: debouncedQuery.length > 0,
-  });
+  const debouncedQuery = useDebouncedValue(query, 300);
+  const trimmed = debouncedQuery.trim();
+  const { data: results = [] } = useFundSearch(trimmed);
 
   // Open dropdown when results arrive from a fresh search
   useEffect(() => {
-    if (debouncedQuery) {
+    if (trimmed) {
       setIsOpen(true);
       setSelectedIndex(-1);
     }
-  }, [debouncedQuery, results]);
+  }, [trimmed, results]);
 
   // Close on outside click
   const handleOutsideClick = useCallback((e: MouseEvent) => {
@@ -54,7 +35,7 @@ export function GlobalSearch() {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [handleOutsideClick]);
 
-  const handleSelect = (_fund: SearchResult) => {
+  const handleSelect = (_fund: { code: string; name: string }) => {
     setIsOpen(false);
     setQuery("");
     // ponytail: both go to /watchlists; split to /funds/:code when detail page exists
@@ -102,7 +83,6 @@ export function GlobalSearch() {
           <button
             onClick={() => {
               setQuery("");
-              setDebouncedQuery("");
               setIsOpen(false);
             }}
             aria-label="清除搜索"
@@ -112,7 +92,7 @@ export function GlobalSearch() {
         )}
       </div>
 
-      {isOpen && debouncedQuery && (
+      {isOpen && trimmed && (
         <div className="absolute z-50 top-full mt-1 w-full bg-surface border border-gray-700 shadow-lg max-h-64 overflow-y-auto">
           {results.length === 0 ? (
             <div className="p-3 text-gray-500 text-sm text-center">

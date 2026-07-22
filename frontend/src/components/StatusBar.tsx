@@ -1,12 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { useSystemStatus } from "@/hooks/useSystemStatus";
 
 export function StatusBar() {
-  const { data, isError } = useQuery({
-    queryKey: ["status"],
-    queryFn: api.getStatus,
-    refetchInterval: 30_000,
-  });
+  const { data, isError } = useSystemStatus();
 
   const connected = !isError;
 
