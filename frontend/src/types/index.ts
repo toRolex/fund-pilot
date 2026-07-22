@@ -87,3 +87,11 @@ export interface HoldingResponse extends Holding {
   pl_percent: number;
   has_signal: boolean;
 }
+
+export interface QdiiPredictResponse {
+  code: string;
+  t1_value: number;
+  t1_date: string;
+  t0_value: number;
+  t0_date: string;
+}

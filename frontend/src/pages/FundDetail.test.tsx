@@ -150,4 +150,80 @@ describe("FundDetail", () => {
 
     fetchSpy.mockRestore();
   });
+
+  describe("QDII Prediction", () => {
+    const qdiiFund = { ...mockFund, type: "QDII", name: "QDII测试基金" };
+    const qdiiPredict = {
+      code: "000001",
+      t1_value: 1.24,
+      t1_date: "2024-01-02",
+      t0_value: 1.235,
+      t0_date: "2024-01-01",
+    };
+
+    it("shows prediction card for QDII funds", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/qdii/")) return new Response(JSON.stringify(qdiiPredict), { status: 200 });
+        if (url.includes("/api/funds/000001/nav")) return new Response(JSON.stringify(mockNav), { status: 200 });
+        if (url.includes("/api/funds/000001/signals")) return new Response(JSON.stringify(mockSignals), { status: 200 });
+        if (url.includes("/api/funds/000001/strategies")) return new Response(JSON.stringify(mockStrategies), { status: 200 });
+        if (url.includes("/api/funds/000001")) return new Response(JSON.stringify(qdiiFund), { status: 200 });
+        return new Response(null, { status: 404 });
+      });
+
+      render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+      await waitFor(() => {
+        expect(screen.getByText("QDII 净值预测")).toBeInTheDocument();
+      });
+      expect(screen.getByText(/1.2400/)).toBeInTheDocument();
+      expect(screen.getByText(/1.2350/)).toBeInTheDocument();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("hides prediction for non-QDII funds", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/funds/000001/nav")) return new Response(JSON.stringify(mockNav), { status: 200 });
+        if (url.includes("/api/funds/000001/signals")) return new Response(JSON.stringify(mockSignals), { status: 200 });
+        if (url.includes("/api/funds/000001/strategies")) return new Response(JSON.stringify(mockStrategies), { status: 200 });
+        if (url.includes("/api/funds/000001")) return new Response(JSON.stringify(mockFund), { status: 200 });
+        return new Response(null, { status: 404 });
+      });
+
+      render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+      await waitFor(() => {
+        expect(screen.getByText(mockFund.name)).toBeInTheDocument();
+      });
+      expect(screen.queryByText("QDII 净值预测")).not.toBeInTheDocument();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("shows error state on QDII prediction failure", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/qdii/")) return new Response(JSON.stringify({ detail: "error" }), { status: 502 });
+        if (url.includes("/api/funds/000001/nav")) return new Response(JSON.stringify(mockNav), { status: 200 });
+        if (url.includes("/api/funds/000001/signals")) return new Response(JSON.stringify(mockSignals), { status: 200 });
+        if (url.includes("/api/funds/000001/strategies")) return new Response(JSON.stringify(mockStrategies), { status: 200 });
+        if (url.includes("/api/funds/000001")) return new Response(JSON.stringify(qdiiFund), { status: 200 });
+        return new Response(null, { status: 404 });
+      });
+
+      render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+      await waitFor(() => {
+        expect(screen.getByText("预测数据暂时不可用")).toBeInTheDocument();
+      });
+
+      fetchSpy.mockRestore();
+    });
+  });
 });

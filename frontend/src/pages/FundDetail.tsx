@@ -310,6 +310,55 @@ function StrategiesSidebar({ code }: { code: string }) {
   );
 }
 
+// ── QDII Prediction Card ─────────────────────────────────────────────────────
+function QdiiPredictCard({ code }: { code: string }) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["qdii-predict", code],
+    queryFn: () => api.getQdiiPredict(code),
+    enabled: !!code,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="bg-[#16161E] border border-white/5 rounded p-4 mb-4 animate-pulse">
+        <div className="h-3 w-24 bg-white/5 mb-3" />
+        <div className="h-4 w-40 bg-white/5" />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="bg-[#16161E] border border-white/5 rounded p-4 mb-4" data-testid="qdii-error">
+        <div className="text-xs text-gray-400 mb-1">QDII 净值预测</div>
+        <div className="text-xs text-gray-500">预测数据暂时不可用</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-[#16161E] border border-white/5 rounded p-4 mb-4" data-testid="qdii-card">
+      <div className="text-xs text-gray-400 mb-3 tracking-wider">QDII 净值预测</div>
+      <div className="flex gap-6">
+        <div>
+          <span className="text-xs text-gray-500">T-1 预测</span>
+          <div className="text-sm text-white font-mono mt-0.5">
+            {data.t1_value.toFixed(4)}
+            <span className="text-xs text-gray-500 ml-2">{data.t1_date}</span>
+          </div>
+        </div>
+        <div>
+          <span className="text-xs text-gray-500">T-0 预测</span>
+          <div className="text-sm text-white font-mono mt-0.5">
+            {data.t0_value.toFixed(4)}
+            <span className="text-xs text-gray-500 ml-2">{data.t0_date}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Fund Detail Page ────────────────────────────────────────────────────────
 export function FundDetail() {
   const { code } = useParams<{ code: string }>();
@@ -372,6 +421,7 @@ export function FundDetail() {
       </div>
 
       {/* Main content area */}
+      {fund.type?.includes("QDII") && <QdiiPredictCard code={fund.code} />}
       <div className="content-grid">
         <div className="main-col">
           <NavChart nav={nav ?? []} signals={signals ?? []} />
