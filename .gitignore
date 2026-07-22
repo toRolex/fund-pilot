@@ -26,3 +26,11 @@ coverage/
 
 # Build artifacts
 *.egg-info/
+
+# Project docs and scratch
+docs/
+prototype/
+
+# Agent config
+CLAUDE.md
+CONTEXT.md
