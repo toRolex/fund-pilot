@@ -5,10 +5,11 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture(autouse=True)
 def _clear_price_cache():
-    """Clear module-level price cache between tests to prevent cross-test pollution."""
-    from app.data import _PRICE_CACHE
+    """Clear module-level caches between tests to prevent cross-test pollution."""
+    from app.data import _PRICE_CACHE, _INFO_CACHE
 
     _PRICE_CACHE.clear()
+    _INFO_CACHE.clear()
 
 
 @pytest.fixture(autouse=True)
