@@ -1,7 +1,7 @@
 """Tests for /api/funds/{code} detail endpoints."""
 import pandas as pd
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
 FUNDS_CSV = """code,name,type
@@ -49,18 +49,16 @@ class TestFundDetail:
         assert resp.status_code == 404
         assert "not found" in resp.text.lower()
 
-    @patch("app.main.xa")
+    @patch("app.main.get_fund_info")
     @patch("app.main.load_fund_price")
-    def test_fund_detail_with_info(self, mock_load, mock_xa, client):
+    def test_fund_detail_with_info(self, mock_load, mock_get_info, client):
         mock_load.return_value = make_price_df()
-        mock_fund = MagicMock()
-        mock_fund.info = {
+        mock_get_info.return_value = {
             "name": "测试基金A",
             "fund_type": "股票型",
             "fund_scale": 12.5,
             "established_date": "2020-01-01",
         }
-        mock_xa.fundinfo.return_value = mock_fund
 
         resp = client.get("/api/funds/000001")
         data = resp.json()

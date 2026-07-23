@@ -67,20 +67,18 @@ class TestEndToEndWorkflow:
     @patch("app.main.load_fund_price")
     @patch("app.holdings.load_fund_price")
     @patch("app.data.load_fund_price")
+    @patch("app.main.get_fund_info")
     @patch("app.main.xa")
-    def test_full_workflow(self, mock_xa, mock_data_load, mock_holdings_load, mock_main_load, client, e2e_state):
+    def test_full_workflow(self, mock_xa, mock_get_info, mock_data_load, mock_holdings_load, mock_main_load, client, e2e_state):
         """Run the complete user workflow and verify each step's outcome."""
 
-        # 1. Add a real fund (mock xalpha so no network call).
-        mock_fund = MagicMock()
-        mock_fund.name = "汇添富中证主要消费ETF"
-        mock_fund.info = {
+        # 1. Add a real fund (mock get_fund_info so no network call).
+        mock_get_info.return_value = {
             "name": "汇添富中证主要消费ETF",
             "fund_type": "股票型",
             "fund_scale": 5.0,
             "established_date": "2015-01-01",
         }
-        mock_xa.fundinfo.return_value = mock_fund
 
         # Mock price data for the new fund: uptrend to trigger buy signals.
         mock_data_load.return_value = _uptrend_df()
@@ -206,22 +204,19 @@ class TestEndToEndWorkflow:
     @patch("app.main.load_fund_price")
     @patch("app.holdings.load_fund_price")
     @patch("app.data.load_fund_price")
-    @patch("app.main.xa")
-    def test_multi_fund_workflow(self, mock_xa, mock_data_load, mock_holdings_load, mock_main_load, client, e2e_state):
+    @patch("app.main.get_fund_info")
+    def test_multi_fund_workflow(self, mock_get_info, mock_data_load, mock_holdings_load, mock_main_load, client, e2e_state):
         """E2E with multiple funds: watchlist expansion + multi-fund momentum."""
-        # Mock xalpha for fund info lookups
+        # Mock fund info lookups
         fund_names = {
             "000001": "基金A",
             "110001": "基金B",
         }
 
         def fundinfo_side_effect(code):
-            mock = MagicMock()
-            mock.name = fund_names.get(code, "未知基金")
-            mock.info = {"fund_type": "混合型"}
-            return mock
+            return {"name": fund_names.get(code, "未知基金"), "fund_type": "混合型"}
 
-        mock_xa.fundinfo.side_effect = fundinfo_side_effect
+        mock_get_info.side_effect = fundinfo_side_effect
 
         # Two funds: one uptrend, one downtrend
         def load_side_effect(code):
@@ -285,16 +280,14 @@ class TestEndToEndWorkflow:
 
     @patch("app.main.load_fund_price")
     @patch("app.data.load_fund_price")
+    @patch("app.main.get_fund_info")
     @patch("app.main.xa")
     def test_qdii_failure_does_not_break_other_flows(
-        self, mock_xa, mock_data_load, mock_main_load, client, e2e_state
+        self, mock_xa, mock_get_info, mock_data_load, mock_main_load, client, e2e_state
     ):
         """A QDII failure is isolated — does not corrupt watchlist/signals/holdings."""
         # Add a fund and run signals first
-        mock_fund = MagicMock()
-        mock_fund.name = "测试基金"
-        mock_fund.info = {}
-        mock_xa.fundinfo.return_value = mock_fund
+        mock_get_info.return_value = {"name": "测试基金"}
         mock_data_load.return_value = _uptrend_df()
         mock_main_load.return_value = _uptrend_df()
 

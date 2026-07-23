@@ -12,6 +12,10 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # ponytail: module-level cache, per-account segregation if multi-user needed
 _PRICE_CACHE: dict[str, tuple[float, pd.DataFrame]] = {}
 
+# ponytail: module-level info cache, per-account segregation if multi-user needed
+_INFO_CACHE: dict[str, tuple[float, dict]] = {}
+_INFO_TTL = 3600  # fund metadata changes infrequently
+
 
 def _get_ttl() -> int:
     """Return cache TTL in seconds: 300 during trading hours, 3600 otherwise."""
@@ -29,6 +33,20 @@ def _get_cached_or_fetch(code: str) -> pd.DataFrame | None:
         if now - ts < _get_ttl():
             return df
     return None
+
+
+def get_fund_info(code: str) -> dict:
+    """Return fund metadata dict (name, type, etc.) using _INFO_CACHE (TTL 3600s)."""
+    now = time.time()
+    cached = _INFO_CACHE.get(code)
+    if cached is not None and now - cached[0] < _INFO_TTL:
+        return cached[1]
+
+    fund = xa.fundinfo(code)
+    raw = fund.info if isinstance(fund.info, dict) else {}
+    raw["name"] = getattr(fund, "name", "")
+    _INFO_CACHE[code] = (time.time(), raw)
+    return raw
 
 
 def load_fund_price(code: str) -> pd.DataFrame:

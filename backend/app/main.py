@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 import xalpha as xa
 
-from app.data import load_all_prices, load_fund_price
+from app.data import get_fund_info, load_all_prices, load_fund_price
 from app.db import get_connection as get_db_connection, init_db, query_signals
 from app.fund_service import compute_daily_change, compute_holding_pl
 from app.holdings import HoldingsService
@@ -77,11 +77,11 @@ async def list_funds(
 
 @api.post("/funds", status_code=201)
 async def add_fund(body: AddFundRequest):
-    # ponytail: single xa.fundinfo call, add retry/circuit-breaker if network flakiness matters
+    # ponytail: get_fund_info with _INFO_CACHE, add retry/circuit-breaker if network flakiness matters
     name = ""
     try:
-        fi = xa.fundinfo(body.code)
-        name = fi.name
+        info = get_fund_info(body.code)
+        name = info.get("name", "")
     except Exception:
         pass
 
@@ -114,8 +114,8 @@ async def search_funds(q: str = ""):
     code = q.strip()
     if code.isdigit():
         try:
-            fi = xa.fundinfo(code)
-            name = getattr(fi, "name", "") or ""
+            info = get_fund_info(code)
+            name = info.get("name", "")
             results[code] = SearchResult(
                 code=code, name=name, is_watched=code in watched_codes
             )
@@ -246,11 +246,9 @@ async def get_fund_detail(code: str):
     if not fund:
         raise HTTPException(status_code=404, detail=f"Fund {code} not found")
 
-    # ponytail: single xa.fundinfo call, add retry/circuit-breaker if network flakiness matters
+    # ponytail: get_fund_info with _INFO_CACHE, add retry/circuit-breaker if network flakiness matters
     try:
-        fi = xa.fundinfo(code)
-        raw = fi.info
-        info = raw if isinstance(raw, dict) else {}
+        info = get_fund_info(code)
     except Exception:
         info = {}
 
