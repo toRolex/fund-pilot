@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -145,3 +145,28 @@ class TestRefreshSignals:
         refresh_signals()
 
         assert get_cache()["last_update"] is not None
+
+    @patch("app.data.xa")
+    def test_refresh_warms_price_cache(self, mock_xa):
+        """refresh_signals() populates _PRICE_CACHE so subsequent load_fund_price
+        returns cached data without calling xa.fundinfo again."""
+        from app.data import _PRICE_CACHE, load_fund_price
+        from app.scheduler import refresh_signals
+
+        df = pd.DataFrame({
+            "date": pd.date_range("2024-01-01", periods=50, freq="D"),
+            "netvalue": [1.0] * 25 + [1.0 + i * 0.02 for i in range(25)],
+        })
+        mock_info = MagicMock()
+        mock_info.price = df
+        mock_xa.fundinfo.return_value = mock_info
+
+        refresh_signals()
+
+        assert "000001" in _PRICE_CACHE
+
+        # Subsequent load_fund_price should hit cache, not call xa.fundinfo
+        mock_xa.fundinfo.reset_mock()
+        result = load_fund_price("000001")
+        assert result is not None
+        mock_xa.fundinfo.assert_not_called()
