@@ -186,3 +186,42 @@ class TestLoadAllPrices:
 
         result = load_all_prices([])
         assert result == {}
+
+
+class TestInfoCache:
+    """_INFO_CACHE: cache hit → no xa.fundinfo call; expired → refetch."""
+
+    def test_cache_hit_returns_cached(self):
+        from app.data import _INFO_CACHE, get_fund_info
+
+        _INFO_CACHE["000001"] = (9999999999.0, {"name": "Test Fund", "fund_type": "股票型"})
+
+        with patch("app.data.xa") as mock_xa:
+            result = get_fund_info("000001")
+
+        mock_xa.fundinfo.assert_not_called()
+        assert result == {"name": "Test Fund", "fund_type": "股票型"}
+        _INFO_CACHE.clear()
+
+    def test_cache_expired_refetches(self):
+        from app.data import _INFO_CACHE, get_fund_info
+
+        _INFO_CACHE["000001"] = (0.0, {"name": "Old Name"})
+
+        mock_fund = MagicMock()
+        mock_fund.name = "New Name"
+        mock_fund.info = {"fund_type": "股票型", "fund_scale": 12.5}
+
+        with patch("app.data.xa") as mock_xa:
+            mock_xa.fundinfo.return_value = mock_fund
+            result = get_fund_info("000001")
+
+        mock_xa.fundinfo.assert_called_once_with("000001")
+        assert result["name"] == "New Name"
+        assert result["fund_type"] == "股票型"
+        _INFO_CACHE.clear()
+
+    def test_cache_ttl_3600(self):
+        from app.data import _INFO_TTL
+
+        assert _INFO_TTL == 3600
