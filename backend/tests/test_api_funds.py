@@ -187,7 +187,6 @@ class TestSearchFunds:
     @patch("app.main.get_fund_info")
     def test_search_partial_name(self, mock_get_info, client):
         """Name partial match finds from watchlist."""
-        mock_get_info.side_effect = ValueError("not found via code")
         resp = client.get("/api/funds/search?q=基金A")
         assert resp.status_code == 200
         data = resp.json()
