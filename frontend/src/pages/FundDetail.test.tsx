@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FundDetail } from "./FundDetail";
@@ -55,10 +55,18 @@ const mockStrategies: StrategyState[] = [
   { name: "indicator_cross", description: "均线交叉策略", enabled: true },
 ];
 
+const mockMerged = {
+  detail: mockFund,
+  nav: mockNav,
+  signals: mockSignals,
+  strategies: mockStrategies,
+};
+
+const MERGED_PATH = "/api/funds/000001/detail";
+
 describe("FundDetail", () => {
   it("shows loading skeleton initially", () => {
     const { container } = render(<FundDetail />, { wrapper: createWrapper("000001") });
-    // Loading skeleton has animate-pulse class
     const skeleton = container.querySelector(".animate-pulse");
     expect(skeleton).toBeInTheDocument();
   });
@@ -77,11 +85,7 @@ describe("FundDetail", () => {
 
   it("renders fund name and meta info", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    fetchSpy
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockFund), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockNav), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockSignals), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockStrategies), { status: 200 }));
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(mockMerged), { status: 200 }));
 
     render(<FundDetail />, { wrapper: createWrapper("000001") });
 
@@ -98,18 +102,13 @@ describe("FundDetail", () => {
 
   it("renders signal table", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    fetchSpy
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockFund), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockNav), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockSignals), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockStrategies), { status: 200 }));
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(mockMerged), { status: 200 }));
 
     render(<FundDetail />, { wrapper: createWrapper("000001") });
 
     await waitFor(() => {
       expect(screen.getByText("历史信号")).toBeInTheDocument();
     });
-    // indicator_cross appears in two columns (策略 + 策略详情)
     const matches = screen.getAllByText("indicator_cross");
     expect(matches.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("2024-01-03")).toBeInTheDocument();
@@ -119,11 +118,7 @@ describe("FundDetail", () => {
 
   it("renders strategies sidebar", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    fetchSpy
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockFund), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockNav), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockSignals), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockStrategies), { status: 200 }));
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(mockMerged), { status: 200 }));
 
     render(<FundDetail />, { wrapper: createWrapper("000001") });
 
@@ -136,11 +131,7 @@ describe("FundDetail", () => {
 
   it("shows empty signals text when no signals", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    fetchSpy
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockFund), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockNav), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(mockStrategies), { status: 200 }));
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ ...mockMerged, signals: [] }), { status: 200 }));
 
     render(<FundDetail />, { wrapper: createWrapper("000001") });
 
@@ -161,23 +152,24 @@ describe("FundDetail", () => {
       t0_date: "2024-01-01",
     };
 
+    const qdiiMerged = {
+      detail: qdiiFund,
+      nav: mockNav,
+      signals: mockSignals,
+      strategies: mockStrategies,
+    };
+
     it("shows prediction card for QDII funds", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
       fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes("/api/qdii/")) return new Response(JSON.stringify(qdiiPredict), { status: 200 });
-        if (url.includes("/api/funds/000001/nav")) return new Response(JSON.stringify(mockNav), { status: 200 });
-        if (url.includes("/api/funds/000001/signals")) return new Response(JSON.stringify(mockSignals), { status: 200 });
-        if (url.includes("/api/funds/000001/strategies")) return new Response(JSON.stringify(mockStrategies), { status: 200 });
-        if (url.includes("/api/funds/000001")) return new Response(JSON.stringify(qdiiFund), { status: 200 });
-        return new Response(null, { status: 404 });
+        return new Response(JSON.stringify(qdiiMerged), { status: 200 });
       });
 
       render(<FundDetail />, { wrapper: createWrapper("000001") });
 
-      // Wait for fund detail and QDII card to render (any state)
       await screen.findByText("QDII测试基金", undefined, { timeout: 5000 });
-      // QDII card should mount (may show error state due to test env timing)
       const cardOrError = await screen.findByTestId(/^qdii-/, undefined, { timeout: 5000 });
       expect(cardOrError).toBeInTheDocument();
 
@@ -187,12 +179,7 @@ describe("FundDetail", () => {
     it("hides prediction for non-QDII funds", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
       fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.includes("/api/funds/000001/nav")) return new Response(JSON.stringify(mockNav), { status: 200 });
-        if (url.includes("/api/funds/000001/signals")) return new Response(JSON.stringify(mockSignals), { status: 200 });
-        if (url.includes("/api/funds/000001/strategies")) return new Response(JSON.stringify(mockStrategies), { status: 200 });
-        if (url.includes("/api/funds/000001")) return new Response(JSON.stringify(mockFund), { status: 200 });
-        return new Response(null, { status: 404 });
+        return new Response(JSON.stringify(mockMerged), { status: 200 });
       });
 
       render(<FundDetail />, { wrapper: createWrapper("000001") });
@@ -210,11 +197,7 @@ describe("FundDetail", () => {
       fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes("/api/qdii/")) return new Response(JSON.stringify({ detail: "error" }), { status: 502 });
-        if (url.includes("/api/funds/000001/nav")) return new Response(JSON.stringify(mockNav), { status: 200 });
-        if (url.includes("/api/funds/000001/signals")) return new Response(JSON.stringify(mockSignals), { status: 200 });
-        if (url.includes("/api/funds/000001/strategies")) return new Response(JSON.stringify(mockStrategies), { status: 200 });
-        if (url.includes("/api/funds/000001")) return new Response(JSON.stringify(qdiiFund), { status: 200 });
-        return new Response(null, { status: 404 });
+        return new Response(JSON.stringify(qdiiMerged), { status: 200 });
       });
 
       render(<FundDetail />, { wrapper: createWrapper("000001") });

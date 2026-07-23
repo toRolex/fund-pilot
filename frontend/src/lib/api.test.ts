@@ -42,6 +42,16 @@ describe("api client", () => {
     expect(typeof api.getStatus).toBe("function");
   });
 
+  it("has getFundDetail", () => {
+    expect(api.getFundDetail).toBeDefined();
+    expect(typeof api.getFundDetail).toBe("function");
+  });
+
+  it("has getFundDetailMerged", () => {
+    expect(api.getFundDetailMerged).toBeDefined();
+    expect(typeof api.getFundDetailMerged).toBe("function");
+  });
+
   describe("importHoldingsFormData", () => {
     it("sends FormData with no explicit Content-Type header", async () => {
       const fd = new FormData();

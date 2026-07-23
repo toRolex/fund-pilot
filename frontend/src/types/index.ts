@@ -95,3 +95,10 @@ export interface QdiiPredictResponse {
   t0_value: number;
   t0_date: string;
 }
+
+export interface FundDetailResponse {
+  detail: FundDetail;
+  nav: NavPoint[];
+  signals: SignalResponse[];
+  strategies: StrategyState[];
+}

@@ -113,3 +113,11 @@ class QdiiPredictResponse(BaseModel):
     t1_date: str
     t0_value: float
     t0_date: str
+
+
+class FundDetailResponse(BaseModel):
+    """Aggregated fund detail for the merged endpoint."""
+    detail: FundDetail
+    nav: list[NavPoint]
+    signals: list[SignalResponse]
+    strategies: list[StrategyState]

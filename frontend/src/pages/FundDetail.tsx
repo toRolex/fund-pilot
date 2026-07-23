@@ -3,16 +3,14 @@ import { ArrowLeft } from "lucide-react";
 import { SignalBadge, SignalBuyMarker, SignalSellMarker, SignalHoldMarker } from "@/components/SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
 import { ErrorState } from "@/components/ErrorState";
-import type { NavPoint, SignalResponse, SignalType } from "@/types";
+import type { NavPoint, SignalResponse, SignalType, StrategyState } from "@/types";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   useFundDetail,
-  useFundNav,
-  useFundSignals,
-  useFundStrategies,
   useToggleFundStrategy,
 } from "@/hooks/useFund";
+import { api } from "@/lib/api";
 
 function LoadingSkeleton() {
   return (
@@ -226,20 +224,8 @@ function SignalTable({ signals }: { signals: SignalResponse[] }) {
 }
 
 // ── Strategy Sidebar (CSS toggle) ────────────────────────────────────────────
-function StrategiesSidebar({ code }: { code: string }) {
-  const { data: strategies, isLoading } = useFundStrategies(code);
+function StrategiesSidebar({ strategies, code }: { strategies: StrategyState[]; code: string }) {
   const toggleMutation = useToggleFundStrategy(code);
-
-  if (isLoading) {
-    return (
-      <div className=" bg-[#16161E] border border-white/5 p-4 animate-pulse">
-        <div className="h-4 w-24 bg-white/5 mb-4" />
-        <div className="space-y-3">
-          {[1, 2].map((i) => <div key={i} className="h-12 bg-white/5" />)}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className=" bg-[#16161E] border border-white/5 p-4">
@@ -323,9 +309,7 @@ function QdiiPredictCard({ code }: { code: string }) {
 // ── Fund Detail Page ────────────────────────────────────────────────────────
 export function FundDetail() {
   const { code } = useParams<{ code: string }>();
-  const { data: fund, isLoading, isError, error, refetch } = useFundDetail(code ?? "");
-  const { data: nav } = useFundNav(code ?? "");
-  const { data: signals } = useFundSignals(code ?? "");
+  const { data: merged, isLoading, isError, error, refetch } = useFundDetail(code ?? "");
 
   if (isLoading) return <LoadingSkeleton />;
 
@@ -344,7 +328,12 @@ export function FundDetail() {
     );
   }
 
-  if (!fund) return null;
+  if (!merged) return null;
+
+  const fund = merged.detail;
+  const nav = merged.nav;
+  const signals = merged.signals;
+  const strategies = merged.strategies;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -392,7 +381,7 @@ export function FundDetail() {
           </div>
         </div>
         <div>
-          <StrategiesSidebar code={code ?? ""} />
+          <StrategiesSidebar strategies={strategies} code={code ?? ""} />
         </div>
       </div>
     </div>
