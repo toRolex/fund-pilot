@@ -82,7 +82,6 @@ class TestPriceCache:
 
         mock_xa.fundinfo.assert_not_called()
         pd.testing.assert_frame_equal(result, mock_price)
-        _PRICE_CACHE.clear()
 
     def test_cache_expired_refetches(self):
         """Expired cache entry → load_fund_price calls xa.fundinfo and refreshes cache."""
@@ -107,12 +106,11 @@ class TestPriceCache:
 
         mock_xa.fundinfo.assert_called_once_with("000001")
         pd.testing.assert_frame_equal(result, mock_price)
-        _PRICE_CACHE.clear()
 
     def test_cache_ttl_trading_vs_nontrading(self):
         """Trading hours → 300s TTL; non-trading → 3600s TTL."""
         from app import scheduler
-        from app.data import _PRICE_CACHE, _get_ttl
+        from app.data import _get_ttl
 
         with patch("app.scheduler.is_trading_time", return_value=True):
             assert _get_ttl() == 300
@@ -120,11 +118,9 @@ class TestPriceCache:
         with patch("app.scheduler.is_trading_time", return_value=False):
             assert _get_ttl() == 3600
 
-        _PRICE_CACHE.clear()
-
     def test_cache_miss_falls_back_to_csv(self, tmp_path):
         """No cache entry + xa fails → CSV fallback still works."""
-        from app.data import _PRICE_CACHE, load_fund_price
+        from app.data import load_fund_price
 
         prices_dir = tmp_path / "prices"
         prices_dir.mkdir(parents=True)
@@ -138,7 +134,6 @@ class TestPriceCache:
 
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 2
-        _PRICE_CACHE.clear()
 
 
 class TestLoadAllPrices:
@@ -201,7 +196,6 @@ class TestInfoCache:
 
         mock_xa.fundinfo.assert_not_called()
         assert result == {"name": "Test Fund", "fund_type": "股票型"}
-        _INFO_CACHE.clear()
 
     def test_cache_expired_refetches(self):
         from app.data import _INFO_CACHE, get_fund_info
@@ -219,7 +213,6 @@ class TestInfoCache:
         mock_xa.fundinfo.assert_called_once_with("000001")
         assert result["name"] == "New Name"
         assert result["fund_type"] == "股票型"
-        _INFO_CACHE.clear()
 
     def test_cache_ttl_3600(self):
         from app.data import _INFO_TTL
