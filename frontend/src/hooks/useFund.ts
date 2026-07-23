@@ -23,7 +23,6 @@ export function useToggleFundStrategy(code: string) {
     mutationFn: (name: string) => api.toggleFundStrategy(code, name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fund-detail-merged", code] });
-      queryClient.invalidateQueries({ queryKey: ["fund-strategies", code] });
     },
   });
 }
