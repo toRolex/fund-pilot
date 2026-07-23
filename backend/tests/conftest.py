@@ -4,6 +4,14 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)
+def _clear_price_cache():
+    """Clear module-level price cache between tests to prevent cross-test pollution."""
+    from app.data import _PRICE_CACHE
+
+    _PRICE_CACHE.clear()
+
+
+@pytest.fixture(autouse=True)
 def _test_db(tmp_path):
     """Use a temp file for each test so data survives across HTTP requests."""
     from app.db import set_db_path
