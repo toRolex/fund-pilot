@@ -1,4 +1,4 @@
-import type { Fund, FundDetail, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
+import type { Fund, FundDetail, FundDetailResponse, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
 
 const BASE = "/api";
 
@@ -56,6 +56,7 @@ export const api = {
   getStrategyLogs: () => request<StrategyLog[]>("/strategies/logs"),
   getStatus: () => request<SystemStatus>("/status"),
   getFundDetail: (code: string) => request<FundDetail>(`/funds/${code}`),
+  getFundDetailMerged: (code: string) => request<FundDetailResponse>(`/funds/${code}/detail`),
   getFundSignals: (code: string) => request<SignalResponse[]>(`/funds/${code}/signals`),
   getFundNav: (code: string) => request<NavPoint[]>(`/funds/${code}/nav`),
   getFundStrategies: (code: string) => request<StrategyState[]>(`/funds/${code}/strategies`),

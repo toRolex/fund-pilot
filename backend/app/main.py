@@ -11,7 +11,7 @@ from app.data import get_fund_info, load_all_prices, load_fund_price
 from app.db import get_connection as get_db_connection, init_db, query_signals
 from app.fund_service import compute_daily_change, compute_holding_pl
 from app.holdings import HoldingsService
-from app.models import AddFundRequest, Fund, FundDetail, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
+from app.models import AddFundRequest, Fund, FundDetail, FundDetailResponse, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
 from app.scheduler import get_cache, start as start_scheduler, stop as stop_scheduler
 from app.strategies import get_fund_enabled_strategies, get_logs, get_strategy, list_strategies, toggle_enabled, toggle_fund_strategy
 from app.watchlist import WatchlistService
@@ -276,6 +276,88 @@ async def get_fund_detail(code: str):
         latest_nav_date=latest_nav_date,
         daily_change=daily_change,
     )
+
+
+@api.get("/funds/{code}/detail")
+async def get_fund_detail_merged(code: str):
+    """Aggregated fund detail: meta, NAV, signals, strategies — one request."""
+    fund = watchlist.get(code)
+    if not fund:
+        raise HTTPException(status_code=404, detail=f"Fund {code} not found")
+
+    # ponytail: get_fund_info with _INFO_CACHE, add retry/circuit-breaker if network flakiness matters
+    try:
+        info = get_fund_info(code)
+    except Exception:
+        info = {}
+
+    price_df = load_fund_price(code)
+
+    # ── detail (FundDetail) ──
+    latest_nav = 0.0
+    latest_nav_date = None
+    if len(price_df) > 0:
+        sorted_price = price_df.sort_values("date")
+        latest_row = sorted_price.iloc[-1]
+        latest_nav = round(float(latest_row["netvalue"]), 4)
+        raw_date = latest_row["date"]
+        latest_nav_date = raw_date.strftime("%Y-%m-%d") if hasattr(raw_date, "strftime") else str(raw_date)
+    daily_change = compute_daily_change(price_df)
+
+    detail = FundDetail(
+        code=fund.code,
+        name=fund.name,
+        type=info.get("fund_type", fund.type or ""),
+        scale=info.get("fund_scale"),
+        established_date=info.get("established_date"),
+        latest_nav=latest_nav,
+        latest_nav_date=latest_nav_date,
+        daily_change=daily_change,
+    )
+
+    # ── nav (NavPoint[]) ──
+    sorted_price = price_df.sort_values("date")
+    nav: list[NavPoint] = []
+    for _, row in sorted_price.iterrows():
+        raw_date = row["date"]
+        date_str = raw_date.strftime("%Y-%m-%d") if hasattr(raw_date, "strftime") else str(raw_date)
+        nav.append(NavPoint(date=date_str, netvalue=round(float(row["netvalue"]), 4)))
+
+    # ── signals (SignalResponse[]) ──
+    signals: list[SignalResponse] = []
+    enabled = get_fund_enabled_strategies(code)
+    for sm in list_strategies():
+        if not enabled.get(sm.name, True):
+            continue
+        fn = get_strategy(sm.name)
+        # ponytail: multi-fund strategies are bulk-only; skip in per-fund endpoint
+        if getattr(fn, "multi_fund", False):
+            continue
+        result = fn(price_df)
+        for s in result:
+            signals.append(SignalResponse(
+                date=s.date,
+                fund_code=fund.code,
+                fund_name=fund.name,
+                strategy_name=s.strategy_name,
+                signal_type=s.signal_type,
+                confidence=s.confidence,
+                daily_change=daily_change,
+            ))
+    signals.sort(key=lambda s: s.date)
+
+    # ── strategies (StrategyState[]) ──
+    enabled_map = get_fund_enabled_strategies(code)
+    strategies = [
+        StrategyState(
+            name=sm.name,
+            description=sm.description,
+            enabled=enabled_map.get(sm.name, True),
+        )
+        for sm in list_strategies()
+    ]
+
+    return FundDetailResponse(detail=detail, nav=nav, signals=signals, strategies=strategies)
 
 
 @api.get("/funds/{code}/signals")
