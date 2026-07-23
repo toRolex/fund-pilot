@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AppRoutes } from "./App";
+import { AppRoutes, queryClient } from "./App";
 
 function renderWithRouter(path: string) {
   const qc = new QueryClient();
@@ -16,6 +16,10 @@ function renderWithRouter(path: string) {
 }
 
 describe("App", () => {
+  it("configures default staleTime of 30s", () => {
+    expect(queryClient.getDefaultOptions().queries?.staleTime).toBe(30000);
+  });
+
   it("renders dashboard on /", () => {
     renderWithRouter("/");
     expect(screen.getByText("信号仪表盘")).toBeInTheDocument();

@@ -5,6 +5,7 @@ import { ConfidenceBar } from "@/components/ConfidenceBar";
 import { ErrorState } from "@/components/ErrorState";
 import type { NavPoint, SignalResponse, SignalType } from "@/types";
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   useFundDetail,
   useFundNav,

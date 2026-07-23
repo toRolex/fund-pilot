@@ -9,7 +9,11 @@ import { Signals } from "./pages/Signals";
 import { Strategies } from "./pages/Strategies";
 import { NotFound } from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000 },
+  },
+});
 
 export function AppRoutes() {
   return (
