@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Holdings } from "./Holdings";
@@ -151,5 +151,108 @@ describe("Holdings page", () => {
     const fileInput = document.querySelector('input[type="file"]');
     expect(fileInput).toBeInTheDocument();
     expect(fileInput).toHaveClass("hidden");
+  });
+
+  // ── CRUD: add panel ──
+  it("shows add holding button when holdings exist", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderHoldings();
+    await waitFor(() => {
+      expect(screen.getByText("添加持仓")).toBeInTheDocument();
+    });
+  });
+
+  it("opens side panel with search input when clicking add holding button", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderHoldings();
+    await waitFor(() => {
+      expect(screen.getByText("000001")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("添加持仓"));
+    expect(screen.getByPlaceholderText("搜索基金")).toBeInTheDocument();
+  });
+
+  // ── CRUD: table actions ──
+  it("shows actions column header", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderHoldings();
+    await waitFor(() => {
+      expect(screen.getByText("操作")).toBeInTheDocument();
+    });
+  });
+
+  it("shows edit and delete buttons per row", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderHoldings();
+    await waitFor(() => {
+      expect(screen.getByText("000001")).toBeInTheDocument();
+    });
+    const editButtons = screen.getAllByText("编辑");
+    expect(editButtons.length).toBe(2);
+    const deleteButtons = screen.getAllByText("删除");
+    expect(deleteButtons.length).toBe(2);
+  });
+
+  // ── CRUD: delete confirmation ──
+  it("shows delete confirmation dialog on delete click", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderHoldings();
+    await waitFor(() => {
+      expect(screen.getByText("000001")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getAllByText("删除")[0]);
+    expect(screen.getByText("确认删除该持仓记录？")).toBeInTheDocument();
+  });
+
+  it("hides delete confirmation on cancel click", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderHoldings();
+    await waitFor(() => {
+      expect(screen.getByText("000001")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getAllByText("删除")[0]);
+    expect(screen.getByText("确认删除该持仓记录？")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("取消"));
+    expect(screen.queryByText("确认删除该持仓记录？")).not.toBeInTheDocument();
+  });
+
+  // ── CRUD: inline edit ──
+  it("enters inline edit mode on edit click", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderHoldings();
+    await waitFor(() => {
+      expect(screen.getByText("000001")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getAllByText("编辑")[0]);
+    expect(await screen.findByText("保存")).toBeInTheDocument();
+    expect(screen.getByText("取消")).toBeInTheDocument();
+  });
+
+  it("cancels inline edit mode", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderHoldings();
+    await waitFor(() => {
+      expect(screen.getByText("000001")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getAllByText("编辑")[0]);
+    expect(screen.getByText("保存")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("取消"));
+    expect(screen.queryByText("保存")).not.toBeInTheDocument();
   });
 });
