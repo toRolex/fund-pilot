@@ -4,7 +4,11 @@ import { Search, X } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useFundSearch } from "@/hooks/useFundSearch";
 
-export function GlobalSearch() {
+interface GlobalSearchProps {
+  onSelect?: (fund: { code: string; name: string }) => void;
+}
+
+export function GlobalSearch({ onSelect }: GlobalSearchProps = {}) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -35,11 +39,15 @@ export function GlobalSearch() {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [handleOutsideClick]);
 
-  const handleSelect = (_fund: { code: string; name: string }) => {
+  const handleSelect = (fund: { code: string; name: string }) => {
     setIsOpen(false);
     setQuery("");
-    // ponytail: both go to /watchlists; split to /funds/:code when detail page exists
-    navigate("/watchlists");
+    if (onSelect) {
+      onSelect(fund);
+    } else {
+      // ponytail: both go to /watchlists; split to /funds/:code when detail page exists
+      navigate("/watchlists");
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

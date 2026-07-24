@@ -1,4 +1,4 @@
-import type { Fund, FundDetail, FundDetailResponse, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
+import type { Fund, FundDetail, FundDetailResponse, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
 
 const BASE = "/api";
 
@@ -66,6 +66,11 @@ export const api = {
       {},
     ),
   getHoldings: () => request<HoldingResponse[]>("/holdings"),
+  addHolding: (data: { fund_code: string; fund_name: string; shares: number; cost_price: number; current_value: number }) =>
+    requestJSON<Holding>("/holdings", data),
+  updateHolding: (code: string, data: { shares: number; cost_price: number }) =>
+    requestPUT<Holding>(`/holdings/${code}`, data),
+  deleteHolding: (code: string) => requestDel(`/holdings/${code}`),
   importHoldings: (body: unknown) => requestJSON<{ imported: number }>("/holdings/import", body),
   importHoldingsFormData: (formData: FormData) =>
     requestFormData<{ imported: number }>("/holdings/import", formData),
