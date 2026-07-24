@@ -70,4 +70,5 @@ export const api = {
   importHoldingsFormData: (formData: FormData) =>
     requestFormData<{ imported: number }>("/holdings/import", formData),
   getQdiiPredict: (code: string) => request<QdiiPredictResponse>(`/qdii/${code}`),
+  runSignals: () => requestJSON<{ status: string }>("/signals/run", {}),
 };
