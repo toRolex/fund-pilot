@@ -11,10 +11,12 @@ from app.data import get_fund_info, load_all_prices, load_fund_price
 from app.db import get_connection as get_db_connection, init_db, query_signals
 from app.fund_service import compute_daily_change, compute_holding_pl
 from app.holdings import HoldingsService
-from app.models import AddFundRequest, Fund, FundDetail, FundDetailResponse, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
+from app.models import AddFundRequest, BacktestRequest, Fund, FundDetail, FundDetailResponse, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
 from app.scheduler import get_cache, start as start_scheduler, stop as stop_scheduler
 from app.strategies import get_fund_enabled_strategies, get_logs, get_strategy, list_strategies, toggle_enabled, toggle_fund_strategy
 from app.watchlist import WatchlistService
+
+import app.backtest as backtest
 
 # API sub-app
 api = FastAPI(title="Fund Signal API")
@@ -583,6 +585,36 @@ async def import_holdings(request: Request):
     # Auto-refresh prices after import
     holdings_service.refresh_prices()
     return {"imported": len(holdings)}
+
+
+@api.post("/backtest")
+async def run_backtest(body: BacktestRequest):
+    """Run a backtest for a fund using the given strategy."""
+    fund = watchlist.get(body.fund_code)
+    if not fund:
+        raise HTTPException(status_code=404, detail=f"Fund {body.fund_code} not found in watchlist")
+
+    try:
+        strategy_fn = get_strategy(body.strategy)
+    except KeyError:
+        raise HTTPException(status_code=422, detail=f"Strategy '{body.strategy}' not found")
+
+    if body.start_date and body.end_date and body.start_date > body.end_date:
+        raise HTTPException(status_code=422, detail="start_date must be <= end_date")
+
+    try:
+        price_df = load_fund_price(body.fund_code)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    return backtest.run_backtest(
+        price_df=price_df,
+        strategy_fn=strategy_fn,
+        params=body.params,
+        start_date=body.start_date,
+        end_date=body.end_date,
+        initial_capital=body.initial_capital,
+    )
 
 
 @api.post("/holdings/refresh")
