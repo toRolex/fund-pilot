@@ -154,3 +154,13 @@ class BacktestResult(BaseModel):
     metrics: BacktestMetrics
     trades: list[BacktestTrade]
     equity_curve: list[EquityPoint]
+
+
+class BacktestRequest(BaseModel):
+    """Input for a backtest run."""
+    fund_code: str
+    strategy: str
+    params: dict | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    initial_capital: float = 100_000.0
