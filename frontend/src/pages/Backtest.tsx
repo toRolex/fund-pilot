@@ -2,85 +2,9 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Play, AlertCircle, BarChart3 } from "lucide-react";
 import type { StrategyPlugin, BacktestMetrics, TradeRecord, EquPoint } from "@/types";
-
-// ponytail: inline mock data, API-driven when backend endpoint exists
-const MOCK_STRATEGIES: StrategyPlugin[] = [
-  {
-    name: "indicator_cross",
-    description: "均线交叉策略：短期均线上穿长期均线买入，下穿卖出",
-    params_schema: {
-      short_window: { type: "int", default: 5, description: "短期均线窗口" },
-      long_window: { type: "int", default: 20, description: "长期均线窗口" },
-    },
-    enabled: true,
-  },
-  {
-    name: "pe_percentile",
-    description: "PE 百分位策略：PE 处于历史低位买入，高位卖出",
-    params_schema: {
-      low_pct: { type: "float", default: 0.2, description: "低估阈值" },
-      high_pct: { type: "float", default: 0.8, description: "高估阈值" },
-    },
-    enabled: true,
-  },
-  {
-    name: "grid",
-    description: "网格策略：价格在网格区间内穿越网格线时触发买入/卖出",
-    params_schema: {
-      low: { type: "float", required: true, description: "网格下界" },
-      high: { type: "float", required: true, description: "网格上界" },
-      n_grids: { type: "int", default: 10, description: "网格分段数" },
-    },
-    enabled: true,
-  },
-];
-
-interface MockResult {
-  metrics: BacktestMetrics;
-  trades: TradeRecord[];
-  equity: EquPoint[];
-}
-
-// ponytail: deterministic-seeded random, replace with real engine
-function generateMockResult(): MockResult {
-  const equity: EquPoint[] = [];
-  let v = 1.0;
-  for (let d = 0; d < 120; d++) {
-    v += (Math.random() - 0.48) * 0.02;
-    const date = new Date(2024, 0, 1);
-    date.setDate(date.getDate() + d);
-    equity.push({ date: date.toISOString().slice(0, 10), value: Math.round(v * 10000) / 10000 });
-  }
-
-  const trades: TradeRecord[] = [];
-  for (let i = 0; i < 18; i++) {
-    const d = 5 + i * 6 + Math.floor(Math.random() * 3);
-    const date = new Date(2024, 0, 1);
-    date.setDate(date.getDate() + d);
-    const type: "buy" | "sell" = i % 2 === 0 ? "buy" : "sell";
-    const price = 1.0 + Math.random() * 0.3;
-    trades.push({
-      date: date.toISOString().slice(0, 10),
-      type,
-      price: Math.round(price * 10000) / 10000,
-      shares: Math.round(Math.random() * 5000 + 1000),
-      amount: Math.round(Math.random() * 8000 + 2000),
-    });
-  }
-
-  return {
-    metrics: {
-      total_return: 0.1523,
-      annual_return: 0.0891,
-      max_drawdown: -0.124,
-      win_rate: 0.611,
-      sharpe_ratio: 1.34,
-      total_trades: 18,
-    },
-    trades,
-    equity,
-  };
-}
+import { useStrategies } from "@/hooks/useStrategies";
+import { useBacktest } from "@/hooks/useBacktest";
+import { ErrorState } from "@/components/ErrorState";
 
 // ── SVG Chart ─────────────────────────────────────────────────────────────
 function EquityChart({ equity }: { equity: EquPoint[] }) {
@@ -253,32 +177,38 @@ function TradesTable({ trades }: { trades: TradeRecord[] }) {
 // ── MAIN ──────────────────────────────────────────────────────────────────
 export function Backtest() {
   const { code = "" } = useParams<{ code: string }>();
-  const [strategy, setStrategy] = useState("indicator_cross");
+  const { data: strategies = [], isLoading: loadingStrategies } = useStrategies();
+  const { mutate, isPending, data: result, error, reset } = useBacktest();
+
+  const [strategy, setStrategy] = useState("");
   const [params, setParams] = useState<Record<string, string>>({});
   const [start, setStart] = useState("2024-01-01");
   const [end, setEnd] = useState("2024-12-31");
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<MockResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const current = MOCK_STRATEGIES.find((s) => s.name === strategy)!;
+  const current = strategies.find((s) => s.name === (strategy || strategies[0]?.name));
+
+  // init default strategy once loaded
+  if (!strategy && strategies.length > 0) {
+    setStrategy(strategies[0].name);
+  }
 
   const handleStrategyChange = (name: string) => {
     setStrategy(name);
     setParams({});
-    setResult(null);
-    setError(null);
+    reset();
   };
 
-  const handleRun = async () => {
-    setRunning(true);
-    setError(null);
-    await new Promise((r) => setTimeout(r, 800));
-    setResult(generateMockResult());
-    setRunning(false);
+  const handleRun = () => {
+    mutate({
+      fund_code: code,
+      strategy,
+      params,
+      start_date: start,
+      end_date: end,
+    });
   };
 
-  const canRun = !running;
+  const canRun = !isPending && !loadingStrategies && strategy !== "";
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -304,13 +234,17 @@ export function Backtest() {
                   onChange={(e) => handleStrategyChange(e.target.value)}
                   className="w-full bg-[#0d0d11] border border-white/10 text-white text-sm px-3 py-2 outline-none focus:border-[#2b7fff] font-mono"
                 >
-                  {MOCK_STRATEGIES.map((s) => (
-                    <option key={s.name} value={s.name}>{s.name}</option>
-                  ))}
+                  {loadingStrategies ? (
+                    <option disabled>加载中...</option>
+                  ) : (
+                    strategies.map((s) => (
+                      <option key={s.name} value={s.name}>{s.name}</option>
+                    ))
+                  )}
                 </select>
               </div>
 
-              <StrategyDetails strategy={current} params={params} onChange={(key, val) => setParams((p) => ({ ...p, [key]: val }))} />
+              {current && <StrategyDetails strategy={current} params={params} onChange={(key, val) => setParams((p) => ({ ...p, [key]: val }))} />}
 
               {/* Date range */}
               <div>
@@ -342,10 +276,10 @@ export function Backtest() {
                 }`}
               >
                 <Play size={14} />
-                {running ? "运行中..." : "运行回测"}
+                {isPending ? "运行中..." : "运行回测"}
               </button>
 
-              {running && (
+              {isPending && (
                 <div className="flex items-center gap-2 text-xs text-gray-400 justify-center">
                   <span className="inline-block w-3 h-3 border-2 border-[#2b7fff] border-t-transparent rounded-full animate-spin" />
                   回测运行中...
@@ -355,8 +289,23 @@ export function Backtest() {
               {error && (
                 <div className="rounded bg-red-400/10 border border-red-400/20 px-3 py-2 flex items-center gap-2 text-xs text-red-400">
                   <AlertCircle size={14} />
-                  {error}
+                  {error.message}
                 </div>
+              )}
+
+              {error && (
+                <button
+                  onClick={() => mutate({
+                    fund_code: code,
+                    strategy,
+                    params,
+                    start_date: start,
+                    end_date: end,
+                  })}
+                  className="w-full text-xs text-[#2b7fff] hover:text-[#4a94ff] text-center mt-1"
+                >
+                  重试
+                </button>
               )}
             </div>
           </div>
@@ -364,7 +313,17 @@ export function Backtest() {
 
         {/* RIGHT: results */}
         <div className="flex-1 min-w-0 space-y-4">
-          {result ? (
+          {error ? (
+            <div className="flex items-center justify-center" style={{ minHeight: 400 }}>
+              <ErrorState message={error.message} onRetry={() => mutate({
+                fund_code: code,
+                strategy,
+                params,
+                start_date: start,
+                end_date: end,
+              })} />
+            </div>
+          ) : result ? (
             <>
               <MetricsCompact m={result.metrics} />
               <EquityChart equity={result.equity} />
