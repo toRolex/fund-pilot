@@ -125,3 +125,17 @@ export interface EquPoint {
   date: string;
   value: number;
 }
+
+// ── Backtest API response (raw backend schema) ───────────────────────────
+export interface BacktestApiResponse {
+  metrics: {
+    total_return: number;
+    annualized_return: number;
+    max_drawdown: number;
+    win_rate: number;
+    sharpe_ratio: number;
+    trade_count: number;
+  };
+  trades: TradeRecord[];
+  equity_curve: { date: string; equity: number }[];
+}

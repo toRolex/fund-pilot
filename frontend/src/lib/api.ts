@@ -1,4 +1,4 @@
-import type { Fund, FundDetail, FundDetailResponse, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
+import type { BacktestApiResponse, Fund, FundDetail, FundDetailResponse, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
 
 const BASE = "/api";
 
@@ -71,4 +71,11 @@ export const api = {
     requestFormData<{ imported: number }>("/holdings/import", formData),
   getQdiiPredict: (code: string) => request<QdiiPredictResponse>(`/qdii/${code}`),
   runSignals: () => requestJSON<{ status: string }>("/signals/run", {}),
+  runBacktest: (params: {
+    fund_code: string;
+    strategy: string;
+    params: Record<string, string>;
+    start_date: string;
+    end_date: string;
+  }) => requestJSON<BacktestApiResponse>("/backtest", params),
 };
