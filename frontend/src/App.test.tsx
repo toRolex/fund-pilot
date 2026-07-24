@@ -45,6 +45,11 @@ describe("App", () => {
     expect(screen.getByText("策略管理")).toBeInTheDocument();
   });
 
+  it("renders backtest page on /funds/:code/backtest", () => {
+    renderWithRouter("/funds/000001/backtest");
+    expect(screen.getByText("回测配置")).toBeInTheDocument();
+  });
+
   it("renders 404 on unknown path", () => {
     renderWithRouter("/unknown");
     expect(screen.getByText("404")).toBeInTheDocument();

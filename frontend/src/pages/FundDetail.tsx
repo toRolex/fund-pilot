@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { SignalBadge, SignalBuyMarker, SignalSellMarker, SignalHoldMarker } from "@/components/SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
@@ -369,6 +369,14 @@ export function FundDetail() {
           <span className="meta-value">{fund.latest_nav.toFixed(4)}</span>
         </div>
       </div>
+
+      {/* Backtest entry */}
+      <Link
+        to={`/funds/${fund.code}/backtest`}
+        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#2b7fff] text-white hover:bg-[#4a94ff] transition-colors mb-4"
+      >
+        回测
+      </Link>
 
       {/* Main content area */}
       {fund.type?.includes("QDII") && <QdiiPredictCard code={fund.code} />}

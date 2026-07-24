@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppShell } from "./components/AppShell";
 import { Dashboard } from "./pages/Dashboard";
 import { FundDetail } from "./pages/FundDetail";
+import { Backtest } from "./pages/Backtest";
 import { Holdings } from "./pages/Holdings";
 import { Watchlists } from "./pages/Watchlists";
 import { Signals } from "./pages/Signals";
@@ -25,6 +26,7 @@ export function AppRoutes() {
         <Route path="/signals" element={<Signals />} />
         <Route path="/strategies" element={<Strategies />} />
         <Route path="/funds/:code" element={<FundDetail />} />
+        <Route path="/funds/:code/backtest" element={<Backtest />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
