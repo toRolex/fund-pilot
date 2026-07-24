@@ -142,6 +142,22 @@ describe("FundDetail", () => {
     fetchSpy.mockRestore();
   });
 
+  it("renders backtest entry link", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(mockMerged), { status: 200 }));
+
+    render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+    await waitFor(() => {
+      expect(screen.getByText("测试基金A")).toBeInTheDocument();
+    });
+    const link = screen.getByRole("link", { name: "回测" });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/funds/000001/backtest");
+
+    fetchSpy.mockRestore();
+  });
+
   describe("QDII Prediction", () => {
     const qdiiFund = { ...mockFund, type: "QDII", name: "QDII测试基金" };
     const qdiiPredict = {

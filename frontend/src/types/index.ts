@@ -102,3 +102,26 @@ export interface FundDetailResponse {
   signals: SignalResponse[];
   strategies: StrategyState[];
 }
+
+// ── Backtest types ────────────────────────────────────────────────────────
+export interface BacktestMetrics {
+  total_return: number;
+  annual_return: number;
+  max_drawdown: number;
+  win_rate: number;
+  sharpe_ratio: number;
+  total_trades: number;
+}
+
+export interface TradeRecord {
+  date: string;
+  type: "buy" | "sell";
+  price: number;
+  shares: number;
+  amount: number;
+}
+
+export interface EquPoint {
+  date: string;
+  value: number;
+}
