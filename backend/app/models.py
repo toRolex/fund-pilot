@@ -121,3 +121,36 @@ class FundDetailResponse(BaseModel):
     nav: list[NavPoint]
     signals: list[SignalResponse]
     strategies: list[StrategyState]
+
+
+class BacktestTrade(BaseModel):
+    """A single trade executed during a backtest."""
+    date: str
+    type: SignalType  # buy or sell
+    price: float
+    shares: float
+    cash_remaining: float
+    total_value: float
+
+
+class BacktestMetrics(BaseModel):
+    """Aggregated performance metrics from a backtest run."""
+    total_return: float
+    annualized_return: float
+    max_drawdown: float
+    win_rate: float
+    sharpe_ratio: float
+    total_trades: int
+
+
+class EquityPoint(BaseModel):
+    """Portfolio value at a point in time during backtest."""
+    date: str
+    total_value: float
+
+
+class BacktestResult(BaseModel):
+    """Result of a backtest run."""
+    metrics: BacktestMetrics
+    trades: list[BacktestTrade]
+    equity_curve: list[EquityPoint]
