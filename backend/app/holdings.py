@@ -77,6 +77,28 @@ class HoldingsService:
             _HOLDINGS[h.fund_code] = h
         _save()
 
+    def add(self, holding: Holding) -> Holding:
+        if holding.fund_code in _HOLDINGS:
+            raise ValueError(f"Holding with code {holding.fund_code} already exists")
+        _HOLDINGS[holding.fund_code] = holding
+        _save()
+        return holding
+
+    def update(self, fund_code: str, data: dict) -> Holding:
+        if fund_code not in _HOLDINGS:
+            raise ValueError(f"Holding with code {fund_code} not found")
+        h = _HOLDINGS[fund_code]
+        for key, value in data.items():
+            setattr(h, key, value)
+        _save()
+        return h
+
+    def delete(self, fund_code: str) -> None:
+        if fund_code not in _HOLDINGS:
+            raise ValueError(f"Holding with code {fund_code} not found")
+        del _HOLDINGS[fund_code]
+        _save()
+
     @staticmethod
     def parse_csv(content: str) -> List[Holding]:
         reader = csv.DictReader(io.StringIO(content))
