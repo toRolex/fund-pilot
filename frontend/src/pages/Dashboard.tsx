@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
 import { SignalBadge } from "@/components/SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
 import { ErrorState } from "@/components/ErrorState";
@@ -14,11 +17,26 @@ export function Dashboard() {
   const [sortKey, setSortKey] = useState<SortKey>("fund_code");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const runMutation = useMutation({
+    mutationFn: api.runSignals,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["signals"] });
+      queryClient.invalidateQueries({ queryKey: ["status"] });
+      setShowSuccess(true);
+      // ponytail: setTimeout for brief "已完成" feedback; use transition state if UX needs control
+      setTimeout(() => setShowSuccess(false), 2000);
+    },
+  });
 
   if (isLoading) {
     return (
       <div className="p-6">
-        <h1 className="page-heading">信号仪表盘</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="page-heading">信号仪表盘</h1>
+        </div>
         <TableSkeleton />
       </div>
     );
@@ -27,7 +45,9 @@ export function Dashboard() {
   if (isError) {
     return (
       <div className="p-6">
-        <h1 className="page-heading">信号仪表盘</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="page-heading">信号仪表盘</h1>
+        </div>
         <ErrorState onRetry={() => refetch()} />
       </div>
     );
@@ -79,7 +99,22 @@ export function Dashboard() {
 
   return (
     <div className="p-6">
-      <h1 className="page-heading">信号仪表盘</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="page-heading">信号仪表盘</h1>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn btn-primary flex items-center gap-1"
+            onClick={() => runMutation.mutate()}
+            disabled={runMutation.isPending}
+          >
+            {runMutation.isPending && <Loader2 className="animate-spin" size={14} />}
+            {runMutation.isPending ? "运行中..." : showSuccess ? "已完成" : "运行信号"}
+          </button>
+          {runMutation.isError && (
+            <span className="text-red-400 text-sm">信号运行失败</span>
+          )}
+        </div>
+      </div>
 
       <div className="stats-row">
         <div className="stat-badge buy">

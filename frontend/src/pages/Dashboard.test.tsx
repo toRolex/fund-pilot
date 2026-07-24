@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dashboard } from "./Dashboard";
@@ -29,6 +29,7 @@ vi.mock("@/lib/api", () => ({
   api: {
     getSignals: vi.fn(),
     getStrategies: vi.fn(),
+    runSignals: vi.fn(),
   },
 }));
 
@@ -94,5 +95,84 @@ describe("Dashboard", () => {
     });
 
     expect(screen.getByText("重试")).toBeInTheDocument();
+  });
+
+  describe("manual signal button", () => {
+    it("renders idle button and calls runSignals on click", async () => {
+      vi.mocked(api.getSignals).mockResolvedValue(mockSignals);
+      vi.mocked(api.runSignals).mockResolvedValue({ status: "ok" });
+
+      renderDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText("测试基金A")).toBeInTheDocument();
+      });
+
+      const btn = screen.getByRole("button", { name: /运行信号/ });
+      expect(btn).not.toBeDisabled();
+
+      fireEvent.click(btn);
+
+      await waitFor(() => {
+        expect(vi.mocked(api.runSignals)).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it("shows disabled loading state while running", async () => {
+      vi.mocked(api.getSignals).mockResolvedValue(mockSignals);
+      vi.mocked(api.runSignals).mockImplementation(() => new Promise(() => {}));
+
+      renderDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText("测试基金A")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /运行信号/ }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /运行中/ })).toBeDisabled();
+      });
+    });
+
+    it("refetches signals on success", async () => {
+      const getSignals = vi.mocked(api.getSignals).mockResolvedValue(mockSignals);
+      vi.mocked(api.runSignals).mockResolvedValue({ status: "ok" });
+
+      renderDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText("测试基金A")).toBeInTheDocument();
+      });
+
+      getSignals.mockClear();
+      getSignals.mockResolvedValue(mockSignals);
+
+      fireEvent.click(screen.getByRole("button", { name: /运行信号/ }));
+
+      await waitFor(() => {
+        expect(getSignals).toHaveBeenCalled();
+      });
+    });
+
+    it("shows error feedback on failure", async () => {
+      vi.mocked(api.getSignals).mockResolvedValue(mockSignals);
+      vi.mocked(api.runSignals).mockRejectedValue(new Error("fail"));
+
+      renderDashboard();
+
+      await waitFor(() => {
+        expect(screen.getByText("测试基金A")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /运行信号/ }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/信号运行失败/)).toBeInTheDocument();
+      });
+
+      // Button is clickable again
+      expect(screen.getByRole("button", { name: /运行信号/ })).not.toBeDisabled();
+    });
   });
 });
