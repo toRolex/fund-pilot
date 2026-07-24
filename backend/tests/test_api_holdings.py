@@ -3,6 +3,8 @@ import pandas as pd
 import pytest
 from unittest.mock import patch
 
+from app.models import Holding
+
 HOLDINGS_CSV = """fund_code,fund_name,shares,cost_price,current_value
 000001,测试基金A,1000.0,1.2500,1.3500
 110001,测试基金B,500.0,2.0000,1.8000
@@ -167,6 +169,128 @@ class TestImportHoldings:
         )
         # FastAPI may handle this differently - just check it doesn't crash
         assert resp.status_code in (200, 422)
+
+
+class TestAddHolding:
+    """HoldingsService.add() — single holding insertion."""
+
+    def test_add_new_holding(self):
+        from app.holdings import HoldingsService
+
+        svc = HoldingsService()
+        new = Holding(
+            fund_code="999999", fund_name="新基金C",
+            shares=300.0, cost_price=3.0, current_value=3.5,
+        )
+        result = svc.add(new)
+        assert result == new
+        codes = [h.fund_code for h in svc.list_all()]
+        assert "999999" in codes
+
+    def test_add_duplicate_code(self):
+        from app.holdings import HoldingsService
+
+        svc = HoldingsService()
+        dup = Holding(
+            fund_code="000001", fund_name="重复基金",
+            shares=100.0, cost_price=1.0, current_value=1.5,
+        )
+        with pytest.raises(ValueError, match="code 000001 already exists"):
+            svc.add(dup)
+
+
+class TestUpdateHolding:
+    """HoldingsService.update() — update fields of a single holding."""
+
+    def test_update_success(self):
+        from app.holdings import HoldingsService
+
+        svc = HoldingsService()
+        result = svc.update("000001", {"shares": 2000.0, "cost_price": 1.5})
+        assert result.fund_code == "000001"
+        assert result.shares == 2000.0
+        assert result.cost_price == 1.5
+        # unchanged fields
+        assert result.fund_name == "测试基金A"
+        assert result.current_value == 1.35
+
+    def test_update_not_found(self):
+        from app.holdings import HoldingsService
+
+        svc = HoldingsService()
+        with pytest.raises(ValueError, match="code 999999 not found"):
+            svc.update("999999", {"shares": 100.0})
+
+
+class TestCreateHoldingEndpoint:
+    """POST /holdings — single holding creation."""
+
+    def test_post_201(self, client):
+        resp = client.post("/api/holdings", json={
+            "fund_code": "999999", "fund_name": "新基金C",
+            "shares": 300.0, "cost_price": 3.0, "current_value": 3.5,
+        })
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["fund_code"] == "999999"
+
+    def test_post_duplicate_409(self, client):
+        resp = client.post("/api/holdings", json={
+            "fund_code": "000001", "fund_name": "重复基金",
+            "shares": 100.0, "cost_price": 1.0, "current_value": 1.5,
+        })
+        assert resp.status_code == 409
+        assert "already exists" in resp.json()["detail"]
+
+
+class TestDeleteHolding:
+    """HoldingsService.delete() — remove a single holding."""
+
+    def test_delete_success(self):
+        from app.holdings import HoldingsService
+
+        svc = HoldingsService()
+        svc.delete("000001")
+        codes = [h.fund_code for h in svc.list_all()]
+        assert "000001" not in codes
+        assert len(codes) == 1
+
+    def test_delete_not_found(self):
+        from app.holdings import HoldingsService
+
+        svc = HoldingsService()
+        with pytest.raises(ValueError, match="code 999999 not found"):
+            svc.delete("999999")
+
+
+class TestUpdateHoldingEndpoint:
+    """PUT /holdings/{code} — update a holding's fields."""
+
+    def test_put_200(self, client):
+        resp = client.put("/api/holdings/000001", json={"shares": 2000.0, "cost_price": 1.5})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["shares"] == 2000.0
+        assert data["cost_price"] == 1.5
+
+    def test_put_404(self, client):
+        resp = client.put("/api/holdings/999999", json={"shares": 100.0})
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"]
+
+
+class TestDeleteHoldingEndpoint:
+    """DELETE /holdings/{code} — delete a holding."""
+
+    def test_delete_200(self, client):
+        resp = client.delete("/api/holdings/000001")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "deleted"
+
+    def test_delete_404(self, client):
+        resp = client.delete("/api/holdings/999999")
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"]
 
 
 class TestHoldingsPL:

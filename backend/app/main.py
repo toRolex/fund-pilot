@@ -491,6 +491,34 @@ async def list_holdings():
     return result
 
 
+@api.post("/holdings", status_code=201)
+async def create_holding(body: Holding):
+    """Add a single holding."""
+    try:
+        return holdings_service.add(body)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@api.put("/holdings/{code}")
+async def update_holding(code: str, body: dict):
+    """Update a holding's fields."""
+    try:
+        return holdings_service.update(code, body)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@api.delete("/holdings/{code}")
+async def delete_holding(code: str):
+    """Delete a holding."""
+    try:
+        holdings_service.delete(code)
+        return {"status": "deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 def _compute_holdings_signal_codes(holdings: list[Holding]) -> set[str]:
     """Run strategies and return set of fund codes that have buy/sell signals."""
     active: set[str] = set()
