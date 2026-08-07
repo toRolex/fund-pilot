@@ -86,6 +86,7 @@ def run_backtest(
                 type=SignalType.buy,
                 price=price,
                 shares=buy_shares,
+                amount=buy_shares * price,
                 cash_remaining=0.0,
                 total_value=shares * price,
             ))
@@ -98,6 +99,7 @@ def run_backtest(
                 type=SignalType.sell,
                 price=price,
                 shares=shares,
+                amount=sell_value,
                 cash_remaining=cash,
                 total_value=cash,
             ))

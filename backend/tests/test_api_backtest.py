@@ -97,6 +97,29 @@ class TestBacktestAPI:
         assert "price" in resp.text.lower() or "data" in resp.text.lower()
 
     @patch("app.main.load_fund_price")
+    def test_trades_include_amount(self, mock_load, client):
+        """Each trade in the response includes amount == price * shares."""
+        mock_load.return_value = pd.DataFrame({
+            "date": pd.date_range("2024-01-01", periods=10, freq="D"),
+            "netvalue": [2.0] * 5 + [2.5] * 5,
+        })
+
+        resp = client.post("/api/backtest", json={
+            "fund_code": "000001",
+            "strategy": "indicator_cross",
+            "params": {"short_window": 2, "long_window": 5},
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-10",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data["trades"], list)
+        assert len(data["trades"]) > 0
+        for t in data["trades"]:
+            assert "amount" in t
+            assert t["amount"] == pytest.approx(t["shares"] * t["price"], abs=1e-6)
+
+    @patch("app.main.load_fund_price")
     def test_correctly_calls_run_backtest(self, mock_load, client):
         """Verify run_backtest is called with deserialized request args."""
         mock_load.return_value = pd.DataFrame({
