@@ -134,8 +134,8 @@ export interface BacktestApiResponse {
     max_drawdown: number;
     win_rate: number;
     sharpe_ratio: number;
-    trade_count: number;
+    total_trades: number;
   };
   trades: TradeRecord[];
-  equity_curve: { date: string; equity: number }[];
+  equity_curve: { date: string; total_value: number }[];
 }
