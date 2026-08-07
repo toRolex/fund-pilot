@@ -250,7 +250,7 @@ describe("Backtest", () => {
     });
   });
 
-  it("shows empty trades hint when no trades", async () => {
+  it("shows friendly empty state when no trades were produced", async () => {
     vi.mocked(api.runBacktest).mockResolvedValue({
       ...mockApiResult,
       trades: [],
@@ -260,9 +260,27 @@ describe("Backtest", () => {
     await waitForStrategies();
     const button = screen.getByRole("button", { name: /运行回测/ });
     await userEvent.click(button);
-    await waitFor(() => {
-      expect(screen.getByText("暂无交易记录")).toBeInTheDocument();
+    expect(await screen.findByText(/所选时间段内无交易产生/)).toBeInTheDocument();
+    // the misleading all-zero metric cards, equity chart and trades table are replaced
+    expect(screen.queryByText(/总收益/)).not.toBeInTheDocument();
+    expect(screen.queryByText("净值曲线")).not.toBeInTheDocument();
+    expect(screen.queryByText("暂无交易记录")).not.toBeInTheDocument();
+  });
+
+  it("renders metrics normally when trades exist even if total_trades is 0", async () => {
+    // trades non-empty (mockApiResult.trades) but total_trades 0 → NOT the no-trade empty state
+    vi.mocked(api.runBacktest).mockResolvedValue({
+      ...mockApiResult,
+      metrics: { ...mockApiResult.metrics, total_trades: 0 },
     });
+    renderBacktest();
+    await waitForStrategies();
+    const button = screen.getByRole("button", { name: /运行回测/ });
+    await userEvent.click(button);
+    await waitFor(() => {
+      expect(screen.getByText(/总收益/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/所选时间段内无交易产生/)).not.toBeInTheDocument();
   });
 
   it("calls runBacktest with correct params", async () => {

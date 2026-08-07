@@ -331,14 +331,24 @@ export function Backtest() {
               })} />
             </div>
           ) : result ? (
-            <>
-              <MetricsCompact m={result.metrics} />
-              <EquityChart equity={result.equity} />
-              <div className="bg-[#16161E] border border-white/5">
-                <div className="p-3 border-b border-white/5 text-xs text-gray-400 tracking-wider">交易记录</div>
-                <TradesTable trades={result.trades} />
+            result.trades.length === 0 && result.metrics.total_trades === 0 ? (
+              <div className="flex items-center justify-center" style={{ minHeight: 400 }}>
+                <div className="text-center">
+                  <BarChart3 className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                  <p className="text-sm text-gray-500">所选时间段内无交易产生</p>
+                  <p className="text-xs text-gray-600 mt-1">请调整策略参数或时间范围后重试</p>
+                </div>
               </div>
-            </>
+            ) : (
+              <>
+                <MetricsCompact m={result.metrics} />
+                <EquityChart equity={result.equity} />
+                <div className="bg-[#16161E] border border-white/5">
+                  <div className="p-3 border-b border-white/5 text-xs text-gray-400 tracking-wider">交易记录</div>
+                  <TradesTable trades={result.trades} />
+                </div>
+              </>
+            )
           ) : (
             <div className="flex items-center justify-center" style={{ minHeight: 400 }}>
               <div className="text-center">
