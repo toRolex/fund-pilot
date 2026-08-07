@@ -24,12 +24,6 @@ export interface SignalResponse {
   daily_change: number;
 }
 
-export interface Watchlist {
-  id: string;
-  name: string;
-  fund_codes: string[];
-}
-
 export interface SearchResult extends Fund {
   is_watched: boolean;
 }

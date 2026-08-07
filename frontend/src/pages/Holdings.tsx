@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Upload, Download, Plus, X } from "lucide-react";
 import { api } from "@/lib/api";
@@ -32,6 +33,7 @@ function LoadingSkeleton() {
 
 export function Holdings() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
@@ -263,7 +265,8 @@ export function Holdings() {
               {safeHoldings.map((h) => (
                 <tr
                   key={h.fund_code}
-                  className="border-b border-white/5 transition-colors hover:bg-white/5"
+                  onClick={() => navigate(`/funds/${h.fund_code}`)}
+                  className="border-b border-white/5 transition-colors hover:bg-white/5 cursor-pointer"
                 >
                   <td className="p-3 font-mono text-xs text-white">{h.fund_code}</td>
                   <td className="p-3 text-xs text-white">{h.fund_name}</td>
@@ -314,7 +317,7 @@ export function Holdings() {
                       <span className="text-xs text-gray-500">&mdash;</span>
                     )}
                   </td>
-                  <td className="p-3">
+                  <td className="p-3" onClick={(e) => e.stopPropagation()}>
                     {editingCode === h.fund_code ? (
                       <div className="flex gap-2">
                         <button

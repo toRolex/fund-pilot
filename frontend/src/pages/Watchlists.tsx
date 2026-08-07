@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, Plus, X } from "lucide-react";
 import { SignalBadge } from "@/components/SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
@@ -10,6 +11,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useFundSearch } from "@/hooks/useFundSearch";
 
 export function Watchlists() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [addSearch, setAddSearch] = useState("");
   const [showAddPanel, setShowAddPanel] = useState(false);
@@ -55,7 +57,7 @@ export function Watchlists() {
 
   return (
     <div className="p-6">
-      <h1 className="page-heading">观察列表</h1>
+      <h1 className="page-heading">自选</h1>
 
       {/* Header: search + add button */}
       <div className="wl-header flex gap-3 mb-4 items-center">
@@ -128,8 +130,8 @@ export function Watchlists() {
       ) : safeItems.length === 0 ? (
         <EmptyState
           icon={"≡"}
-          title="观察列表为空"
-          description="开始你的量化信号之旅 — 搜索并添加你的第一只基金到观察列表。"
+          title="自选为空"
+          description="开始你的量化信号之旅 — 搜索并添加你的第一只基金到自选。"
           action={
             <button className="btn btn-primary" onClick={() => setShowAddPanel(true)}>
               添加基金
@@ -158,7 +160,11 @@ export function Watchlists() {
             </thead>
             <tbody>
               {filtered.map((item) => (
-                <tr key={item.code}>
+                <tr
+                  key={item.code}
+                  onClick={() => navigate(`/funds/${item.code}`)}
+                  className="cursor-pointer hover:bg-[var(--hover)]"
+                >
                   <td className="font-mono">{item.code}</td>
                   <td>{item.name}</td>
                   <td className={`num ${item.daily_change >= 0 ? "green" : "red"}`}>
@@ -176,7 +182,7 @@ export function Watchlists() {
                   <td className="num">
                     <ConfidenceBar value={item.confidence} />
                   </td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     {removeConfirm === item.code ? (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-[var(--fg-2)]">确认删除？</span>

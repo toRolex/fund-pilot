@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Holdings } from "./Holdings";
 
@@ -33,8 +33,14 @@ function renderHoldings() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
-        <Holdings />
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<Holdings />} />
+          <Route
+            path="/funds/:code"
+            element={<div data-testid="fund-detail-marker">Fund Detail</div>}
+          />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -199,6 +205,20 @@ describe("Holdings page", () => {
     expect(editButtons.length).toBe(2);
     const deleteButtons = screen.getAllByText("删除");
     expect(deleteButtons.length).toBe(2);
+  });
+
+  it("navigates to fund detail when clicking a holding row", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(mockHoldings), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderHoldings();
+    await waitFor(() => {
+      expect(screen.getByText("000001")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("000001"));
+    await waitFor(() => {
+      expect(screen.getByTestId("fund-detail-marker")).toBeInTheDocument();
+    });
   });
 
   // ── CRUD: delete confirmation ──

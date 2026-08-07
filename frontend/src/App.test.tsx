@@ -32,7 +32,8 @@ describe("App", () => {
 
   it("renders watchlists on /watchlists", () => {
     renderWithRouter("/watchlists");
-    expect(screen.getAllByText("观察列表").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("自选").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("观察列表")).not.toBeInTheDocument();
   });
 
   it("renders signals on /signals", () => {

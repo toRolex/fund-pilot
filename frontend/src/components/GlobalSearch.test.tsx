@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GlobalSearch } from "./GlobalSearch";
 
@@ -9,7 +9,13 @@ function renderSearch() {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/"]}>
-        <GlobalSearch />
+        <Routes>
+          <Route path="/" element={<GlobalSearch />} />
+          <Route
+            path="/funds/:code"
+            element={<div data-testid="fund-detail-marker">Fund Detail</div>}
+          />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -42,7 +48,7 @@ describe("GlobalSearch", () => {
 
     await waitFor(() => {
       expect(screen.getByText("000001")).toBeInTheDocument();
-      expect(screen.getByText("已关注")).toBeInTheDocument();
+      expect(screen.getByText("已自选")).toBeInTheDocument();
     });
   }, 10000);
 
@@ -62,7 +68,7 @@ describe("GlobalSearch", () => {
     fireEvent.change(input, { target: { value: "999999" } });
 
     await waitFor(() => {
-      expect(screen.getByText("未关注")).toBeInTheDocument();
+      expect(screen.getByText("未自选")).toBeInTheDocument();
     });
   }, 10000);
 
@@ -83,7 +89,7 @@ describe("GlobalSearch", () => {
     });
   }, 10000);
 
-  it("navigates to /watchlists on click and clears input", async () => {
+  it("navigates to fund detail on click", async () => {
     const results = [
       { code: "000001", name: "测试基金A", type: "股票型", is_watched: true },
     ];
@@ -103,7 +109,9 @@ describe("GlobalSearch", () => {
     });
 
     fireEvent.click(screen.getByText("000001"));
-    expect(input).toHaveValue("");
+    await waitFor(() => {
+      expect(screen.getByTestId("fund-detail-marker")).toBeInTheDocument();
+    });
   }, 10000);
 
   it("closes dropdown on Escape", async () => {
@@ -131,7 +139,7 @@ describe("GlobalSearch", () => {
     });
   }, 10000);
 
-  it("navigates on Enter after keyboard selection", async () => {
+  it("navigates to fund detail on Enter after keyboard selection", async () => {
     const results = [
       { code: "000001", name: "测试基金A", is_watched: true },
     ];
@@ -152,6 +160,8 @@ describe("GlobalSearch", () => {
 
     fireEvent.keyDown(input, { key: "ArrowDown" });
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(input).toHaveValue("");
+    await waitFor(() => {
+      expect(screen.getByTestId("fund-detail-marker")).toBeInTheDocument();
+    });
   }, 10000);
 });

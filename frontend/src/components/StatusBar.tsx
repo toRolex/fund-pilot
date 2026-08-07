@@ -18,7 +18,7 @@ export function StatusBar() {
           <>
             <span>上次更新: {formatTime(data.last_update)}</span>
             <span>策略: {data.strategies_running} 个运行中</span>
-            <span>基金: {data.funds_watched} 只关注</span>
+            <span>基金: {data.funds_watched} 只自选</span>
           </>
         )}
       </div>
