@@ -129,6 +129,7 @@ class BacktestTrade(BaseModel):
     type: SignalType  # buy or sell
     price: float
     shares: float
+    amount: float  # executed value = shares * price
     cash_remaining: float
     total_value: float
 

@@ -91,6 +91,20 @@ class TestRunBacktest:
         assert result.trades[0].shares == 50000.0
         assert result.trades[0].cash_remaining == 0.0
 
+    # Seam 3b: buy trade amount == shares * price
+    def test_buy_trade_amount_is_shares_times_price(self):
+        from app.backtest import run_backtest
+
+        # Price = 2.0, buy signal on day 0 → shares = 100000 / 2 = 50000
+        # amount = shares * price = 50000 * 2.0 = 100000 (== original cash)
+        df = _price_df([2.0] * 10)
+        result = run_backtest(df, _flat_buy_strategy, {}, "2024-01-01", "2024-01-10")
+        assert len(result.trades) == 1
+        buy = result.trades[0]
+        assert buy.type == SignalType.buy
+        assert buy.amount == buy.shares * buy.price
+        assert buy.amount == pytest.approx(100000.0)
+
     # Seam 4: sell signal simulation
     def test_sell_signal_releases_cash(self):
         from app.backtest import run_backtest
@@ -103,6 +117,20 @@ class TestRunBacktest:
         assert sells[0].price == 2.5
         assert sells[0].shares == 50000.0
         assert sells[0].cash_remaining == 125000.0
+
+    # Seam 4b: sell trade amount == shares * price
+    def test_sell_trade_amount_is_shares_times_price(self):
+        from app.backtest import run_backtest
+
+        # Buy day 0 at 2.0 → 50000 shares; sell day 5 at 2.5
+        # amount = shares * price = 50000 * 2.5 = 125000 (== sell_value)
+        df = _price_df([2.0, 2.0, 2.0, 2.0, 2.0, 2.5, 2.5, 2.5, 2.5, 2.5])
+        result = run_backtest(df, _buy_sell_strategy, {}, "2024-01-01", "2024-01-10")
+        sells = [t for t in result.trades if t.type == SignalType.sell]
+        assert len(sells) == 1
+        sell = sells[0]
+        assert sell.amount == sell.shares * sell.price
+        assert sell.amount == pytest.approx(125000.0)
 
     # Seam 5: sell without position is ignored
     def test_sell_without_position_ignored(self):
