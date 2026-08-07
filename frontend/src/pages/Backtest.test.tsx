@@ -44,6 +44,14 @@ const mockStrategies = [
     },
     enabled: true,
   },
+  {
+    name: "momentum",
+    description: "动量轮动策略：按 N 日收益率排名多只基金，rank_1 持有、rank_2+ 观望",
+    params_schema: {
+      n_days: { type: "int", default: 20, description: "回看天数" },
+    },
+    enabled: true,
+  },
 ];
 
 const mockApiResult = {
@@ -113,6 +121,19 @@ describe("Backtest", () => {
     expect(options[1]).toHaveValue("pe_percentile");
     expect(options[2]).toHaveValue("grid");
     expect(screen.queryByText("momentum")).not.toBeInTheDocument();
+  });
+
+  it("filters the multi-fund momentum strategy out of the strategy dropdown", async () => {
+    renderBacktest();
+    await waitForStrategies();
+    const options = screen.getAllByRole("option");
+    expect(options).toHaveLength(3);
+    expect(options.map((o) => o as HTMLOptionElement).map((o) => o.value)).toEqual([
+      "indicator_cross",
+      "pe_percentile",
+      "grid",
+    ]);
+    expect(screen.queryByRole("option", { name: "momentum" })).not.toBeInTheDocument();
   });
 
   it("shows empty state in the result area initially", async () => {

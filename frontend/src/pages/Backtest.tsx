@@ -6,6 +6,11 @@ import { useStrategies } from "@/hooks/useStrategies";
 import { useBacktest } from "@/hooks/useBacktest";
 import { ErrorState } from "@/components/ErrorState";
 
+// Only single-fund backtestable strategies can run here. momentum is a
+// multi-fund cross-sectional strategy, so it is filtered out page-locally
+// without touching the strategy registry / API (other consumers unaffected).
+const BACKTESTABLE_STRATEGIES = new Set(["indicator_cross", "pe_percentile", "grid"]);
+
 // ── SVG Chart ─────────────────────────────────────────────────────────────
 function EquityChart({ equity }: { equity: EquPoint[] }) {
   if (equity.length === 0) return null;
@@ -177,7 +182,9 @@ function TradesTable({ trades }: { trades: TradeRecord[] }) {
 // ── MAIN ──────────────────────────────────────────────────────────────────
 export function Backtest() {
   const { code = "" } = useParams<{ code: string }>();
-  const { data: strategies = [], isLoading: loadingStrategies } = useStrategies();
+  const { data: allStrategies = [], isLoading: loadingStrategies } = useStrategies();
+  // Filtered list drives the dropdown, current lookup and default selection below.
+  const strategies = allStrategies.filter((s) => BACKTESTABLE_STRATEGIES.has(s.name));
   const { mutate, isPending, data: result, error, reset } = useBacktest();
 
   const [strategy, setStrategy] = useState("");
