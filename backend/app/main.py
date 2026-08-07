@@ -11,18 +11,27 @@ from app.data import get_fund_info, load_all_prices, load_fund_price
 from app.db import get_connection as get_db_connection, init_db, query_signals
 from app.fund_service import compute_daily_change, compute_holding_pl
 from app.holdings import HoldingsService
-from app.models import AddFundRequest, BacktestRequest, Fund, FundDetail, FundDetailResponse, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
-from app.scheduler import get_cache, start as start_scheduler, stop as stop_scheduler
+from app.models import AddFundRequest, Fund, FundDetail, FundDetailResponse, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
+from app.scheduler import get_cache, refresh_signals, start as start_scheduler, stop as stop_scheduler
 from app.strategies import get_fund_enabled_strategies, get_logs, get_strategy, list_strategies, toggle_enabled, toggle_fund_strategy
 from app.watchlist import WatchlistService
-
-import app.backtest as backtest
 
 # API sub-app
 api = FastAPI(title="Fund Signal API")
 
 watchlist = WatchlistService()
 holdings_service = HoldingsService()
+
+# ponytail: simple module-level cache for all-fund name search via akshare
+_ALL_FUNDS_CACHE = None
+
+
+def _get_all_funds():
+    global _ALL_FUNDS_CACHE
+    if _ALL_FUNDS_CACHE is None:
+        import akshare as ak
+        _ALL_FUNDS_CACHE = ak.fund_name_em()
+    return _ALL_FUNDS_CACHE
 
 
 @api.get("/health")
@@ -111,6 +120,7 @@ async def search_funds(q: str = ""):
         return []
     results: dict[str, SearchResult] = {}
     watched_codes = {f.code for f in watchlist.list_all()}
+    q_lower = q.strip().lower()
 
     # Try xalpha for exact code lookup
     code = q.strip()
@@ -133,9 +143,24 @@ async def search_funds(q: str = ""):
                 code=fund.code, name=fund.name, type=fund.type, is_watched=True
             )
 
-    # ponytail: xalpha for exact code only; name-based all-fund search needs a
-    # broader source (e.g., fund list API) if watchlist-only is too narrow
-    return list(results.values())[:10]
+    # Broader all-fund name search via akshare
+    try:
+        import akshare as ak
+        all_funds = _get_all_funds()
+        if all_funds is not None:
+            for _, row in all_funds.iterrows():
+                fc, fn = str(row["基金代码"]), row["基金简称"]
+                if fc in results:
+                    results[fc].is_watched = fc in watched_codes
+                    continue
+                if q_lower in fc or q_lower in fn.lower():
+                    results[fc] = SearchResult(
+                        code=fc, name=fn, is_watched=fc in watched_codes
+                    )
+    except Exception:
+        pass
+
+    return list(results.values())[:20]
 
 
 @api.get("/strategies")
@@ -587,36 +612,6 @@ async def import_holdings(request: Request):
     return {"imported": len(holdings)}
 
 
-@api.post("/backtest")
-async def run_backtest(body: BacktestRequest):
-    """Run a backtest for a fund using the given strategy."""
-    fund = watchlist.get(body.fund_code)
-    if not fund:
-        raise HTTPException(status_code=404, detail=f"Fund {body.fund_code} not found in watchlist")
-
-    try:
-        strategy_fn = get_strategy(body.strategy)
-    except KeyError:
-        raise HTTPException(status_code=422, detail=f"Strategy '{body.strategy}' not found")
-
-    if body.start_date and body.end_date and body.start_date > body.end_date:
-        raise HTTPException(status_code=422, detail="start_date must be <= end_date")
-
-    try:
-        price_df = load_fund_price(body.fund_code)
-    except ValueError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-    return backtest.run_backtest(
-        price_df=price_df,
-        strategy_fn=strategy_fn,
-        params=body.params,
-        start_date=body.start_date,
-        end_date=body.end_date,
-        initial_capital=body.initial_capital,
-    )
-
-
 @api.post("/holdings/refresh")
 async def refresh_holdings():
     """Refresh current_value for all holdings from latest NAV."""
@@ -631,6 +626,8 @@ async def lifespan(app: FastAPI):
     init_db(conn)
     conn.close()
     start_scheduler()
+    # ponytail: run signals once on startup so Dashboard isn't empty outside trading hours
+    refresh_signals()
     yield
     stop_scheduler()
 
