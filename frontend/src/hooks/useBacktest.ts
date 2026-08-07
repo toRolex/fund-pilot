@@ -27,10 +27,10 @@ export function useBacktest() {
           max_drawdown: raw.metrics.max_drawdown,
           win_rate: raw.metrics.win_rate,
           sharpe_ratio: raw.metrics.sharpe_ratio,
-          total_trades: raw.metrics.trade_count,
+          total_trades: raw.metrics.total_trades,
         },
         trades: raw.trades,
-        equity: raw.equity_curve.map((p) => ({ date: p.date, value: p.equity })),
+        equity: raw.equity_curve.map((p) => ({ date: p.date, value: p.total_value })),
       };
     },
   });

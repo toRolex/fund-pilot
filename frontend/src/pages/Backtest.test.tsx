@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Backtest } from "./Backtest";
 import type { ReactNode } from "react";
+import type { BacktestApiResponse } from "@/types";
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -46,22 +47,22 @@ const mockStrategies = [
   },
 ];
 
-const mockApiResult = {
+const mockApiResult: BacktestApiResponse = {
   metrics: {
     total_return: 0.1523,
     annualized_return: 0.0891,
     max_drawdown: -0.124,
     win_rate: 0.611,
     sharpe_ratio: 1.34,
-    trade_count: 18,
+    total_trades: 18,
   },
   trades: [
     { date: "2024-01-10", type: "buy", price: 1.05, shares: 3000, amount: 3150 },
     { date: "2024-01-20", type: "sell", price: 1.12, shares: 3000, amount: 3360 },
   ],
   equity_curve: [
-    { date: "2024-01-01", equity: 1.0 },
-    { date: "2024-01-02", equity: 1.01 },
+    { date: "2024-01-01", total_value: 1.0 },
+    { date: "2024-01-02", total_value: 1.01 },
   ],
 };
 
@@ -171,6 +172,7 @@ describe("Backtest", () => {
     });
     expect(screen.getByText("15.23%")).toBeInTheDocument();
     expect(screen.getByText("8.91%")).toBeInTheDocument();
+    expect(screen.getByText("18")).toBeInTheDocument();
   });
 
   it("shows trade table after running backtest", async () => {
@@ -231,7 +233,7 @@ describe("Backtest", () => {
     vi.mocked(api.runBacktest).mockResolvedValue({
       ...mockApiResult,
       trades: [],
-      metrics: { ...mockApiResult.metrics, trade_count: 0 },
+      metrics: { ...mockApiResult.metrics, total_trades: 0 },
     });
     renderBacktest();
     await waitForStrategies();
