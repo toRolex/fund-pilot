@@ -45,8 +45,7 @@ export function GlobalSearch({ onSelect }: GlobalSearchProps = {}) {
     if (onSelect) {
       onSelect(fund);
     } else {
-      // ponytail: both go to /watchlists; split to /funds/:code when detail page exists
-      navigate("/watchlists");
+      navigate(`/funds/${fund.code}`);
     }
   };
 
@@ -123,9 +122,9 @@ export function GlobalSearch({ onSelect }: GlobalSearchProps = {}) {
                   </span>
                 </div>
                 {fund.is_watched ? (
-                  <span className="text-xs text-blue-400 shrink-0">已关注</span>
+                  <span className="text-xs text-blue-400 shrink-0">已自选</span>
                 ) : (
-                  <span className="text-xs text-gray-500 shrink-0">未关注</span>
+                  <span className="text-xs text-gray-500 shrink-0">未自选</span>
                 )}
               </button>
             ))

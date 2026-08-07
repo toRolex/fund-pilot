@@ -33,13 +33,14 @@ function renderAppShell(initialPath = "/") {
 }
 
 describe("AppShell", () => {
-  it("renders 5 navigation items", () => {
+  it("renders 4 navigation items with no hardcoded fund detail entry", () => {
     renderAppShell("/");
     expect(screen.getByText("仪表盘")).toBeInTheDocument();
-    expect(screen.getByText("观察列表")).toBeInTheDocument();
-    expect(screen.getByText("基金详情")).toBeInTheDocument();
+    expect(screen.getByText("自选")).toBeInTheDocument();
     expect(screen.getByText("策略")).toBeInTheDocument();
     expect(screen.getByText("持仓")).toBeInTheDocument();
+    expect(screen.queryByText("观察列表")).not.toBeInTheDocument();
+    expect(screen.queryByText("基金详情")).not.toBeInTheDocument();
   });
 
   it("highlights nav item matching current route", () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Watchlists } from "./Watchlists";
 
@@ -8,8 +8,14 @@ function renderWatchlists() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
-        <Watchlists />
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<Watchlists />} />
+          <Route
+            path="/funds/:code"
+            element={<div data-testid="fund-detail-marker">Fund Detail</div>}
+          />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -33,6 +39,36 @@ describe("Watchlists page", () => {
     renderWatchlists();
     await waitFor(() => {
       expect(screen.getByText(/开始你的量化信号之旅/i)).toBeInTheDocument();
+    });
+  });
+
+  it("uses 自选 terminology in heading and empty state", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderWatchlists();
+    expect(screen.getByRole("heading", { name: "自选" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/自选为空/)).toBeInTheDocument();
+      expect(screen.getByText(/到自选/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText("观察列表")).not.toBeInTheDocument();
+  });
+
+  it("navigates to fund detail when clicking a row", async () => {
+    const items = [
+      { code: "CN-AM-001", name: "Alpha 动量", daily_change: 2.31, signal_type: "buy" as const, strategy_name: "动量交叉", confidence: 0.88 },
+    ];
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(items), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    renderWatchlists();
+    await waitFor(() => {
+      expect(screen.getByText("CN-AM-001")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("CN-AM-001"));
+    await waitFor(() => {
+      expect(screen.getByTestId("fund-detail-marker")).toBeInTheDocument();
     });
   });
 

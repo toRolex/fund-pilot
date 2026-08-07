@@ -4,8 +4,7 @@ import { StatusBar } from "./StatusBar";
 
 const NAV_ITEMS = [
   { to: "/", label: "仪表盘", icon: "▰" },
-  { to: "/watchlists", label: "观察列表", icon: "☰" },
-  { to: "/funds/000001", label: "基金详情", icon: "◉" },
+  { to: "/watchlists", label: "自选", icon: "☰" },
   { to: "/strategies", label: "策略", icon: "▤" },
   { to: "/holdings", label: "持仓", icon: "▣" },
 ];

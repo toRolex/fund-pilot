@@ -36,7 +36,7 @@ describe("StatusBar", () => {
     await waitFor(() => {
       expect(screen.getByText("运行中")).toBeInTheDocument();
       expect(screen.getByText("策略: 2 个运行中")).toBeInTheDocument();
-      expect(screen.getByText("基金: 3 只关注")).toBeInTheDocument();
+      expect(screen.getByText("基金: 3 只自选")).toBeInTheDocument();
     });
   });
 
