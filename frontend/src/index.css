@@ -115,6 +115,68 @@ body {
   color: var(--muted);
 }
 
+/* ── Quick range segmented control ──────────────────────────────────────── */
+.range-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: var(--space-3);
+}
+.range-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-tiny);
+  font-family: inherit;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+.range-btn:hover {
+  color: var(--fg);
+}
+.range-btn.active {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent-hover);
+}
+
+/* ── Range stats strip ─────────────────────────────────────────────────── */
+.range-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.range-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.range-stat-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.range-stat-value {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Bottom time-axis brush ────────────────────────────────────────────── */
+.brush-foot {
+  font-size: var(--fs-tiny);
+  color: var(--muted);
+  margin-top: 2px;
+}
+
 /* ── Content grid + rail ──────────────────────────────────────────────── */
 .content-grid {
   display: grid;

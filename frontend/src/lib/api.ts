@@ -1,4 +1,4 @@
-import type { BacktestApiResponse, Fund, FundDetail, FundDetailResponse, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
+import type { BacktestApiResponse, Fund, FundDetail, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, StrategyLog, StrategyPlugin, StrategyState, SystemStatus } from "@/types";
 
 const BASE = "/api";
 
@@ -48,15 +48,19 @@ export const api = {
   addFund: (code: string) => requestJSON<Fund>("/funds", { code }),
   removeFund: (code: string) => requestDel(`/funds/${code}`),
   searchFunds: (q: string) => request<SearchResult[]>(`/funds/search?q=${encodeURIComponent(q)}`),
-  getSignals: (code?: string) =>
-    request<SignalResponse[]>(`/signals${code ? `?fund_code=${code}` : ""}`),
+  getSignals: (code?: string, opts: { all_history?: boolean } = {}) => {
+    const params = new URLSearchParams();
+    if (code) params.set("fund_code", code);
+    if (opts.all_history) params.set("all_history", "true");
+    const qs = params.toString();
+    return request<SignalResponse[]>(`/signals${qs ? `?${qs}` : ""}`);
+  },
   getStrategies: () => request<StrategyPlugin[]>("/strategies"),
   toggleStrategy: (name: string, enabled: boolean) =>
     requestPUT<StrategyPlugin>(`/strategies/${encodeURIComponent(name)}`, { enabled }),
   getStrategyLogs: () => request<StrategyLog[]>("/strategies/logs"),
   getStatus: () => request<SystemStatus>("/status"),
   getFundDetail: (code: string) => request<FundDetail>(`/funds/${code}`),
-  getFundDetailMerged: (code: string) => request<FundDetailResponse>(`/funds/${code}/detail`),
   getFundSignals: (code: string) => request<SignalResponse[]>(`/funds/${code}/signals`),
   getFundNav: (code: string) => request<NavPoint[]>(`/funds/${code}/nav`),
   getFundStrategies: (code: string) => request<StrategyState[]>(`/funds/${code}/strategies`),

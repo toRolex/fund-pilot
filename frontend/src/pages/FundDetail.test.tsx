@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FundDetail } from "./FundDetail";
@@ -55,14 +55,40 @@ const mockStrategies: StrategyState[] = [
   { name: "indicator_cross", description: "均线交叉策略", enabled: true },
 ];
 
-const mockMerged = {
-  detail: mockFund,
-  nav: mockNav,
-  signals: mockSignals,
-  strategies: mockStrategies,
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+// 并行端点：基金信息 + 净值 + 持久化信号 + 策略状态（不调用 /detail）
+type FetchMock = {
+  mockImplementation(fn: (input: RequestInfo | URL) => Promise<Response>): unknown;
 };
 
-const MERGED_PATH = "/api/funds/000001/detail";
+function mockDetailApi(
+  fetchSpy: FetchMock,
+  overrides: Partial<{ fund: FundDetailType; nav: NavPoint[]; signals: SignalResponse[]; strategies: StrategyState[] }> = {},
+) {
+  const fund = overrides.fund ?? mockFund;
+  const nav = overrides.nav ?? mockNav;
+  const signals = overrides.signals ?? mockSignals;
+  const strategies = overrides.strategies ?? mockStrategies;
+  const qdiiPredict = {
+    code: "000001",
+    t1_value: 1.24,
+    t1_date: "2024-01-02",
+    t0_value: 1.235,
+    t0_date: "2024-01-01",
+  };
+  fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/api/funds/000001/nav")) return json(nav);
+    if (url.includes("/api/signals")) return json(signals);
+    if (url.includes("/api/funds/000001/strategies")) return json(strategies);
+    if (url.includes("/api/funds/000001")) return json(fund);
+    if (url.includes("/api/qdii/")) return json(qdiiPredict);
+    return json({ detail: "not found" }, 404);
+  });
+}
 
 describe("FundDetail", () => {
   it("shows loading skeleton initially", () => {
@@ -85,7 +111,7 @@ describe("FundDetail", () => {
 
   it("renders fund name and meta info", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(mockMerged), { status: 200 }));
+    mockDetailApi(fetchSpy);
 
     render(<FundDetail />, { wrapper: createWrapper("000001") });
 
@@ -102,7 +128,7 @@ describe("FundDetail", () => {
 
   it("renders signal table", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(mockMerged), { status: 200 }));
+    mockDetailApi(fetchSpy);
 
     render(<FundDetail />, { wrapper: createWrapper("000001") });
 
@@ -118,7 +144,7 @@ describe("FundDetail", () => {
 
   it("renders strategies sidebar", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(mockMerged), { status: 200 }));
+    mockDetailApi(fetchSpy);
 
     render(<FundDetail />, { wrapper: createWrapper("000001") });
 
@@ -131,7 +157,7 @@ describe("FundDetail", () => {
 
   it("shows empty signals text when no signals", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ ...mockMerged, signals: [] }), { status: 200 }));
+    mockDetailApi(fetchSpy, { signals: [] });
 
     render(<FundDetail />, { wrapper: createWrapper("000001") });
 
@@ -144,7 +170,7 @@ describe("FundDetail", () => {
 
   it("renders backtest entry link", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(mockMerged), { status: 200 }));
+    mockDetailApi(fetchSpy);
 
     render(<FundDetail />, { wrapper: createWrapper("000001") });
 
@@ -158,30 +184,47 @@ describe("FundDetail", () => {
     fetchSpy.mockRestore();
   });
 
+  it("quick range switch updates chart data range and range stats", async () => {
+    const fullNav: NavPoint[] = Array.from({ length: 130 }, (_, i) => {
+      const d = new Date(Date.UTC(2024, 0, 1 + i));
+      return { date: d.toISOString().slice(0, 10), netvalue: Number((1 + i * 0.01).toFixed(4)) };
+    });
+    const signals: SignalResponse[] = [
+      { ...mockSignals[0], date: fullNav[5].date },
+      { ...mockSignals[0], date: fullNav[125].date, signal_type: "sell" },
+    ];
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    mockDetailApi(fetchSpy, { nav: fullNav, signals });
+
+    render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("range-stats")).toBeInTheDocument();
+    });
+    // 默认全部：区间涨跌 +129.00%，区间信号数 2
+    expect(screen.getByTestId("range-return").textContent).toBe("+129.00%");
+    expect(screen.getByTestId("range-signal-count").textContent).toBe("2");
+    expect(screen.getByTestId("chart-date-range").textContent).toContain(fullNav[0].date);
+
+    // 切换近1月 → 主图数据范围与区间统计联动
+    fireEvent.click(screen.getByRole("button", { name: "近1月" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("range-return").textContent).not.toBe("+129.00%");
+    });
+    expect(screen.getByTestId("range-signal-count").textContent).toBe("1");
+    expect(screen.getByTestId("chart-date-range").textContent).toContain(fullNav[109].date);
+
+    fetchSpy.mockRestore();
+  });
+
   describe("QDII Prediction", () => {
     const qdiiFund = { ...mockFund, type: "QDII", name: "QDII测试基金" };
-    const qdiiPredict = {
-      code: "000001",
-      t1_value: 1.24,
-      t1_date: "2024-01-02",
-      t0_value: 1.235,
-      t0_date: "2024-01-01",
-    };
-
-    const qdiiMerged = {
-      detail: qdiiFund,
-      nav: mockNav,
-      signals: mockSignals,
-      strategies: mockStrategies,
-    };
 
     it("shows prediction card for QDII funds", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
-      fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.includes("/api/qdii/")) return new Response(JSON.stringify(qdiiPredict), { status: 200 });
-        return new Response(JSON.stringify(qdiiMerged), { status: 200 });
-      });
+      mockDetailApi(fetchSpy, { fund: qdiiFund });
 
       render(<FundDetail />, { wrapper: createWrapper("000001") });
 
@@ -194,9 +237,7 @@ describe("FundDetail", () => {
 
     it("hides prediction for non-QDII funds", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
-      fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
-        return new Response(JSON.stringify(mockMerged), { status: 200 });
-      });
+      mockDetailApi(fetchSpy);
 
       render(<FundDetail />, { wrapper: createWrapper("000001") });
 
@@ -210,10 +251,15 @@ describe("FundDetail", () => {
 
     it("shows error state on QDII prediction failure", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
+      mockDetailApi(fetchSpy, { fund: qdiiFund });
       fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
         const url = String(input);
-        if (url.includes("/api/qdii/")) return new Response(JSON.stringify({ detail: "error" }), { status: 502 });
-        return new Response(JSON.stringify(qdiiMerged), { status: 200 });
+        if (url.includes("/api/qdii/")) return json({ detail: "error" }, 502);
+        if (url.includes("/api/funds/000001/nav")) return json(mockNav);
+        if (url.includes("/api/signals")) return json(mockSignals);
+        if (url.includes("/api/funds/000001/strategies")) return json(mockStrategies);
+        if (url.includes("/api/funds/000001")) return json(qdiiFund);
+        return json({ detail: "not found" }, 404);
       });
 
       render(<FundDetail />, { wrapper: createWrapper("000001") });
