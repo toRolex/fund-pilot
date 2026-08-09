@@ -26,10 +26,13 @@ export function useFundStrategies(code: string) {
   });
 }
 
-export function useToggleFundStrategy(code: string) {
+export function useSetFundStrategy(code: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => api.toggleFundStrategy(code, name),
+    mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
+      enabled
+        ? api.runFundStrategy(code, name).then(() => ({ name, enabled }))
+        : api.setFundStrategyEnabled(code, name, false),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fund-detail", code] });
     },

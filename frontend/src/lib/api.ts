@@ -64,11 +64,10 @@ export const api = {
   getFundSignals: (code: string) => request<SignalResponse[]>(`/funds/${code}/signals`),
   getFundNav: (code: string) => request<NavPoint[]>(`/funds/${code}/nav`),
   getFundStrategies: (code: string) => request<StrategyState[]>(`/funds/${code}/strategies`),
-  toggleFundStrategy: (code: string, strategy: string) =>
-    requestJSON<{ name: string; enabled: boolean }>(
-      `/funds/${code}/strategies/${strategy}`,
-      {},
-    ),
+  runFundStrategy: (code: string, strategy: string) =>
+    requestJSON<SignalResponse[]>(`/funds/${code}/strategies/${strategy}/run`, {}),
+  setFundStrategyEnabled: (code: string, strategy: string, enabled: boolean) =>
+    requestPUT<{ name: string; enabled: boolean }>(`/funds/${code}/strategies/${strategy}`, { enabled }),
   getHoldings: () => request<HoldingResponse[]>("/holdings"),
   addHolding: (data: { fund_code: string; fund_name: string; shares: number; cost_price: number; current_value: number }) =>
     requestJSON<Holding>("/holdings", data),

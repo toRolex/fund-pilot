@@ -32,7 +32,7 @@ interface MarkerProps { cx: number; cy: number }
 
 export function SignalBuyMarker({ cx, cy }: MarkerProps) {
   return (
-    <g>
+    <g data-testid="signal-marker-buy">
       <circle cx={cx} cy={cy} r={5} fill="none" stroke="var(--signal-buy)" strokeWidth={1.5} />
       <circle cx={cx} cy={cy} r={2.5} fill="var(--signal-buy)" />
     </g>
@@ -41,12 +41,16 @@ export function SignalBuyMarker({ cx, cy }: MarkerProps) {
 
 export function SignalSellMarker({ cx, cy }: MarkerProps) {
   return (
-    <polygon points={`${cx},${cy - 8} ${cx - 5},${cy} ${cx + 5},${cy}`} fill="var(--signal-sell)" />
+    <polygon
+      data-testid="signal-marker-sell"
+      points={`${cx},${cy - 8} ${cx - 5},${cy} ${cx + 5},${cy}`}
+      fill="var(--signal-sell)"
+    />
   );
 }
 
 export function SignalHoldMarker({ cx, cy }: MarkerProps) {
-  return <rect x={cx - 3} y={cy - 3} width={6} height={6} fill="var(--signal-hold)" />;
+  return <rect data-testid="signal-marker-hold" x={cx - 3} y={cy - 3} width={6} height={6} fill="var(--signal-hold)" />;
 }
 
 // ponytail: CSS-only tooltip, migrate to @headlessui Popover if richer interaction needed

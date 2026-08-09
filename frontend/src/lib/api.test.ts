@@ -47,6 +47,44 @@ describe("api client", () => {
     expect(typeof api.getFundDetail).toBe("function");
   });
 
+  it("has runFundStrategy", () => {
+    expect(api.runFundStrategy).toBeDefined();
+    expect(typeof api.runFundStrategy).toBe("function");
+  });
+
+  it("has setFundStrategyEnabled", () => {
+    expect(api.setFundStrategyEnabled).toBeDefined();
+    expect(typeof api.setFundStrategyEnabled).toBe("function");
+  });
+
+  it("runFundStrategy POSTs to the run endpoint", async () => {
+    const fetchMock = vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 }),
+    );
+
+    await api.runFundStrategy("000001", "indicator_cross");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/funds/000001/strategies/indicator_cross/run",
+      expect.objectContaining({ method: "POST" }),
+    );
+    fetchMock.mockRestore();
+  });
+
+  it("setFundStrategyEnabled PUTs enabled body", async () => {
+    const fetchMock = vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ name: "indicator_cross", enabled: false }), { status: 200 }),
+    );
+
+    await api.setFundStrategyEnabled("000001", "indicator_cross", false);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/funds/000001/strategies/indicator_cross",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify({ enabled: false }) }),
+    );
+    fetchMock.mockRestore();
+  });
+
   it("has getFundNav", () => {
     expect(api.getFundNav).toBeDefined();
     expect(typeof api.getFundNav).toBe("function");
