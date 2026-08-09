@@ -18,6 +18,7 @@ class TestDbInit:
         names = [r[0] for r in tables]
         assert "signal_run" in names
         assert "signal_item" in names
+        assert "fund_strategy" in names
 
     def test_init_db_is_idempotent(self):
         from app.db import get_connection, init_db
@@ -28,7 +29,7 @@ class TestDbInit:
         tables = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
         ).fetchall()
-        assert len(tables) == 2
+        assert len(tables) == 3
 
     def test_tables_have_correct_columns(self):
         from app.db import get_connection, init_db

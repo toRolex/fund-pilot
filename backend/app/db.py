@@ -24,6 +24,14 @@ CREATE TABLE IF NOT EXISTS signal_item (
     detail TEXT
 )"""
 
+_FUND_STRATEGY_SQL = """\
+CREATE TABLE IF NOT EXISTS fund_strategy (
+    fund_code TEXT NOT NULL,
+    strategy TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (fund_code, strategy)
+)"""
+
 _ADD_DATE_SQL = "ALTER TABLE signal_item ADD COLUMN date TEXT"
 
 _DB_PATH: str = str(Path(__file__).resolve().parent.parent / "data" / "signals.db")
@@ -44,6 +52,7 @@ def get_connection() -> sqlite3.Connection:
 def init_db(conn: sqlite3.Connection) -> None:
     conn.execute(_RUN_SQL)
     conn.execute(_ITEM_SQL)
+    conn.execute(_FUND_STRATEGY_SQL)
     try:
         conn.execute(_ADD_DATE_SQL)
     except sqlite3.OperationalError:
@@ -112,3 +121,27 @@ def query_signals(
         sql += " WHERE " + " AND ".join(conditions)
     sql += " ORDER BY si.id"
     return [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
+def get_fund_strategy_state(conn: sqlite3.Connection, fund_code: str) -> dict[str, bool]:
+    """Return {strategy: enabled} rows for a fund from the fund_strategy table."""
+    rows = conn.execute(
+        "SELECT strategy, enabled FROM fund_strategy WHERE fund_code = ?",
+        (fund_code,),
+    ).fetchall()
+    return {row["strategy"]: bool(row["enabled"]) for row in rows}
+
+
+def set_fund_strategy_state(
+    conn: sqlite3.Connection,
+    fund_code: str,
+    strategy: str,
+    enabled: bool,
+) -> None:
+    """Upsert a fund/strategy enabled row. Default for unknown rows is disabled."""
+    conn.execute(
+        "INSERT INTO fund_strategy (fund_code, strategy, enabled) VALUES (?, ?, ?) "
+        "ON CONFLICT(fund_code, strategy) DO UPDATE SET enabled = excluded.enabled",
+        (fund_code, strategy, 1 if enabled else 0),
+    )
+    conn.commit()

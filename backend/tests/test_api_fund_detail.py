@@ -185,15 +185,16 @@ class TestFundStrategies:
         assert resp.status_code == 404
 
     def test_toggle_strategy(self, client):
+        # Default is disabled; no-body PUT toggles to enabled
         resp = client.put("/api/funds/000001/strategies/indicator_cross")
         assert resp.status_code == 200
         data = resp.json()
         assert data["name"] == "indicator_cross"
-        assert data["enabled"] is False
+        assert data["enabled"] is True
 
         resp2 = client.put("/api/funds/000001/strategies/indicator_cross")
         data2 = resp2.json()
-        assert data2["enabled"] is True
+        assert data2["enabled"] is False
 
     def test_toggle_strategy_not_found(self, client):
         resp = client.put("/api/funds/000001/strategies/nonexistent")
