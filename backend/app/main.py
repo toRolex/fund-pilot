@@ -36,6 +36,20 @@ def _get_all_funds():
     return _ALL_FUNDS_CACHE
 
 
+def _row_to_signal_response(row: dict, funds_map: dict, daily_change: float) -> SignalResponse:
+    """Convert a query_signals row into an enriched SignalResponse."""
+    fund = funds_map.get(row["fund_code"])
+    return SignalResponse(
+        date=row["date"] or row["detail"] or "",
+        fund_code=row["fund_code"],
+        fund_name=fund.name if fund else "",
+        strategy_name=row["strategy"],
+        signal_type=SignalType(row["signal"]),
+        confidence=row["value"] or 0.0,
+        daily_change=daily_change,
+    )
+
+
 @api.get("/health")
 async def health():
     return {"status": "ok"}
@@ -205,15 +219,20 @@ async def get_signals(
     fund_code: Optional[str] = Query(None),
     run_id: Optional[int] = Query(None),
     strategy: Optional[str] = Query(None),
+    all_history: bool = Query(False),
 ):
     """Read signals from SQLite, enriched with fund name and daily change.
 
-    Optional filters: ?fund_code=, ?run_id=, ?strategy=
+    Optional filters: ?fund_code=, ?run_id=, ?strategy=, ?all_history=
     Default: returns only the latest run's signals.
+    all_history=true: returns signals across all runs.
     """
     conn = get_db_connection()
     init_db(conn)
-    rows = query_signals(conn, fund_code=fund_code, run_id=run_id, strategy=strategy)
+    rows = query_signals(
+        conn, fund_code=fund_code, run_id=run_id, strategy=strategy,
+        all_history=all_history,
+    )
     conn.close()
 
     if not rows:
@@ -353,26 +372,13 @@ async def get_fund_detail_merged(code: str):
         nav.append(NavPoint(date=date_str, netvalue=round(float(row["netvalue"]), 4)))
 
     # ── signals (SignalResponse[]) ──
-    signals: list[SignalResponse] = []
-    enabled = get_fund_enabled_strategies(code)
-    for sm in list_strategies():
-        if not enabled.get(sm.name, True):
-            continue
-        fn = get_strategy(sm.name)
-        # ponytail: multi-fund strategies are bulk-only; skip in per-fund endpoint
-        if getattr(fn, "multi_fund", False):
-            continue
-        result = fn(price_df)
-        for s in result:
-            signals.append(SignalResponse(
-                date=s.date,
-                fund_code=fund.code,
-                fund_name=fund.name,
-                strategy_name=s.strategy_name,
-                signal_type=s.signal_type,
-                confidence=s.confidence,
-                daily_change=daily_change,
-            ))
+    conn = get_db_connection()
+    init_db(conn)
+    rows = query_signals(conn, fund_code=code, all_history=True)
+    conn.close()
+
+    funds_map = {f.code: f for f in watchlist.list_all()}
+    signals = [_row_to_signal_response(row, funds_map, daily_change) for row in rows]
     signals.sort(key=lambda s: s.date)
 
     # ── strategies (StrategyState[]) ──
@@ -391,7 +397,7 @@ async def get_fund_detail_merged(code: str):
 
 @api.get("/funds/{code}/signals")
 async def get_fund_signals(code: str):
-    """Historical signals for a specific fund."""
+    """Historical signals for a specific fund, read from persisted DB."""
     fund = watchlist.get(code)
     if not fund:
         raise HTTPException(status_code=404, detail=f"Fund {code} not found")
@@ -399,27 +405,13 @@ async def get_fund_signals(code: str):
     price_df = load_fund_price(code)
     daily_change = compute_daily_change(price_df)
 
-    signals: list[SignalResponse] = []
-    enabled = get_fund_enabled_strategies(code)
-    for sm in list_strategies():
-        if not enabled.get(sm.name, True):
-            continue
-        fn = get_strategy(sm.name)
-        # ponytail: multi-fund strategies are bulk-only; skip in per-fund endpoint
-        if getattr(fn, "multi_fund", False):
-            continue
-        result = fn(price_df)
-        for s in result:
-            signals.append(SignalResponse(
-                date=s.date,
-                fund_code=fund.code,
-                fund_name=fund.name,
-                strategy_name=s.strategy_name,
-                signal_type=s.signal_type,
-                confidence=s.confidence,
-                daily_change=daily_change,
-            ))
+    conn = get_db_connection()
+    init_db(conn)
+    rows = query_signals(conn, fund_code=code, all_history=True)
+    conn.close()
 
+    funds_map = {f.code: f for f in watchlist.list_all()}
+    signals = [_row_to_signal_response(row, funds_map, daily_change) for row in rows]
     signals.sort(key=lambda s: s.date)
     return signals
 

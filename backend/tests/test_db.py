@@ -221,6 +221,35 @@ class TestQuerySignalsFilter:
         assert len(results) == 1
         assert results[0]["signal"] == "sell"
 
+    def test_all_history_returns_all_runs(self):
+        from app.db import get_connection, init_db, save_signal_run, save_signal_item, query_signals
+
+        conn = get_connection()
+        init_db(conn)
+        r1 = save_signal_run(conn, "ma", "2024-01-01T00:00:00")
+        save_signal_item(conn, r1, "000001", "buy", 0.8, "2024-01-01")
+        r2 = save_signal_run(conn, "ma", "2024-01-02T00:00:00")
+        save_signal_item(conn, r2, "000001", "sell", 0.7, "2024-01-02")
+
+        results = query_signals(conn, all_history=True)
+        assert len(results) == 2
+        assert {r["signal"] for r in results} == {"buy", "sell"}
+
+    def test_all_history_with_fund_code(self):
+        from app.db import get_connection, init_db, save_signal_run, save_signal_item, query_signals
+
+        conn = get_connection()
+        init_db(conn)
+        r1 = save_signal_run(conn, "ma", "2024-01-01T00:00:00")
+        save_signal_item(conn, r1, "000001", "buy", 0.8, "2024-01-01")
+        save_signal_item(conn, r1, "000002", "sell", 0.7, "2024-01-01")
+        r2 = save_signal_run(conn, "ma", "2024-01-02T00:00:00")
+        save_signal_item(conn, r2, "000001", "sell", 0.7, "2024-01-02")
+
+        results = query_signals(conn, fund_code="000001", all_history=True)
+        assert len(results) == 2
+        assert {r["signal"] for r in results} == {"buy", "sell"}
+
 
 class TestPersistenceAcrossConnections:
     def test_data_survives_reconnect(self):
