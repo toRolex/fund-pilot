@@ -1,13 +1,14 @@
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { SignalBadge } from "@/components/SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
 import { ErrorState } from "@/components/ErrorState";
-import { NavChart } from "@/components/NavChart";
+import { NavChart, type NavChartHandle } from "@/components/NavChart";
 import { StrategyPanel, DETAIL_PANEL_STRATEGIES } from "@/components/StrategyPanel";
 import type { SignalResponse } from "@/types";
 import { useQuery } from "@tanstack/react-query";
-import { useFundDetail } from "@/hooks/useFund";
+import { useFundDetail, useSetFundStrategy } from "@/hooks/useFund";
 import { api } from "@/lib/api";
 
 function LoadingSkeleton() {
@@ -121,6 +122,82 @@ export function FundDetail() {
   const { code } = useParams<{ code: string }>();
   const { data: merged, isLoading, isError, error, refetch } = useFundDetail(code ?? "");
 
+  // T6 键盘快捷键：←/→ 平移 · 1–5 切换区间 · E/V/N 开关策略 · ? 帮助
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const navRef = useRef<NavChartHandle>(null);
+  const setStrategy = useSetFundStrategy(code ?? "");
+
+  // 通过 ref 读取最新策略态，避免键盘监听器反复重挂
+  const strategiesRef = useRef(merged?.strategies);
+  strategiesRef.current = merged?.strategies;
+
+  const toggleStrategyRef = useRef<(name: string) => void>(() => {});
+  toggleStrategyRef.current = (name: string) => {
+    const list = strategiesRef.current ?? [];
+    if (!list.some((s) => s.name === name)) return;
+    const s = list.find((x) => x.name === name);
+    setStrategy.mutate({ name, enabled: !(s?.enabled ?? false) });
+  };
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      switch (e.key) {
+        case "ArrowLeft":
+          if (navRef.current) {
+            e.preventDefault();
+            navRef.current.pan(-1);
+          }
+          break;
+        case "ArrowRight":
+          if (navRef.current) {
+            e.preventDefault();
+            navRef.current.pan(1);
+          }
+          break;
+        case "1":
+          navRef.current?.setRange("1m");
+          break;
+        case "2":
+          navRef.current?.setRange("3m");
+          break;
+        case "3":
+          navRef.current?.setRange("6m");
+          break;
+        case "4":
+          navRef.current?.setRange("1y");
+          break;
+        case "5":
+          navRef.current?.setRange("all");
+          break;
+        case "e":
+        case "E":
+          toggleStrategyRef.current("indicator_cross");
+          break;
+        case "v":
+        case "V":
+          toggleStrategyRef.current("pe_percentile");
+          break;
+        case "n":
+        case "N":
+          toggleStrategyRef.current("grid");
+          break;
+        case "?":
+          setShowShortcuts((v) => !v);
+          break;
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   if (isLoading) return <LoadingSkeleton />;
 
   if (isError) {
@@ -199,11 +276,41 @@ export function FundDetail() {
         回测
       </Link>
 
+      {/* 键盘快捷键帮助（T6） */}
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => setShowShortcuts((v) => !v)}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-300 border border-white/10 hover:text-white transition-colors"
+        >
+          快捷键 <span className="text-gray-500">?</span>
+        </button>
+        {showShortcuts && (
+          <div
+            data-testid="shortcut-help"
+            className="mt-2 max-w-md space-y-1 border border-white/10 bg-[#16161E] p-3 text-xs text-gray-400"
+          >
+            <div>
+              <kbd>←</kbd>/<kbd>→</kbd> 平移净值图时间窗口
+            </div>
+            <div>
+              <kbd>1</kbd>–<kbd>5</kbd> 切换快捷区间：近1月 / 近3月 / 近半年 / 近1年 / 全部
+            </div>
+            <div>
+              <kbd>E</kbd> 均线 · <kbd>V</kbd> PE 估值 · <kbd>N</kbd> 网格（再次按下关闭）
+            </div>
+            <div>
+              <kbd>?</kbd> 打开/关闭本帮助
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Main content area */}
       {fund.type?.includes("QDII") && <QdiiPredictCard code={fund.code} />}
       <div className="content-grid">
         <div className="main-col">
-          <NavChart nav={nav ?? []} signals={visibleSignals} />
+          <NavChart ref={navRef} nav={nav ?? []} signals={visibleSignals} />
           <div>
             <h2 className="mb-3 text-sm font-semibold text-white">历史信号</h2>
             <SignalTable signals={visibleSignals} />

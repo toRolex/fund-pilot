@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { act, createRef } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { NavChart } from "./NavChart";
+import type { NavChartHandle } from "./NavChart";
 import type { NavPoint, SignalResponse } from "@/types";
 
 function makeNav(n = 260): NavPoint[] {
@@ -125,5 +127,39 @@ describe("NavChart", () => {
     // 图表用 viewBox 响应式缩放，无固定像素 width
     expect(chart).toHaveAttribute("viewBox", "0 0 700 280");
     expect(chart.hasAttribute("width")).toBe(false);
+  });
+});
+
+describe("NavChart keyboard imperative API (T6)", () => {
+  it("setRange via ref updates the window and syncs segmented control", () => {
+    const nav = makeNav();
+    const ref = createRef<NavChartHandle>();
+    render(<NavChart ref={ref} nav={nav} signals={makeSignals(nav)} />);
+
+    act(() => ref.current?.setRange("1m"));
+
+    expect(screen.getByRole("button", { name: "近1月" })).toHaveAttribute("aria-pressed", "true");
+    const range = screen.getByTestId("chart-date-range").textContent ?? "";
+    expect(range).toContain(nav[239].date);
+  });
+
+  it("pan via ref shifts the visible window left and right", () => {
+    const nav = makeNav();
+    const ref = createRef<NavChartHandle>();
+    render(<NavChart ref={ref} nav={nav} signals={makeSignals(nav)} />);
+
+    // 近1月 → 窗口 [239, 259]；向左平移 2 → [237, 257]
+    act(() => ref.current?.setRange("1m"));
+    act(() => ref.current?.pan(-1));
+
+    const left = screen.getByTestId("chart-date-range").textContent ?? "";
+    expect(left).toContain(nav[237].date);
+    expect(left).not.toContain(nav[259].date);
+
+    // 向右平移 2 → 回到 [239, 259]
+    act(() => ref.current?.pan(1));
+
+    const right = screen.getByTestId("chart-date-range").textContent ?? "";
+    expect(right).toContain(nav[259].date);
   });
 });
