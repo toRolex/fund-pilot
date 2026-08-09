@@ -47,9 +47,22 @@ describe("api client", () => {
     expect(typeof api.getFundDetail).toBe("function");
   });
 
-  it("has getFundDetailMerged", () => {
-    expect(api.getFundDetailMerged).toBeDefined();
-    expect(typeof api.getFundDetailMerged).toBe("function");
+  it("has getFundNav", () => {
+    expect(api.getFundNav).toBeDefined();
+    expect(typeof api.getFundNav).toBe("function");
+  });
+
+  it("getSignals builds all_history query param", async () => {
+    const fetchMock = vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 }),
+    );
+
+    await api.getSignals("000001", { all_history: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/signals?fund_code=000001&all_history=true",
+    );
+    fetchMock.mockRestore();
   });
 
   describe("importHoldingsFormData", () => {
