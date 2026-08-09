@@ -148,6 +148,17 @@ class TestSignalsEndpoint:
             mock_load.return_value = mock_price
             client.post("/api/signals/run")
 
+    def _populate_db_multiple(self, client, n_runs=2):
+        """Run signals multiple times so GET can distinguish runs."""
+        with patch("app.main.load_fund_price") as mock_load:
+            mock_price = pd.DataFrame({
+                "date": pd.date_range("2024-01-01", periods=50, freq="D"),
+                "netvalue": [1.0] * 25 + [1.0 + i * 0.02 for i in range(25)],
+            })
+            mock_load.return_value = mock_price
+            for _ in range(n_runs):
+                client.post("/api/signals/run")
+
     def test_signals_empty_db(self, client):
         """No data in SQLite returns empty list."""
         resp = client.get("/api/signals")
@@ -216,3 +227,50 @@ class TestSignalsEndpoint:
             curr = data[i]
             nxt = data[i + 1]
             assert (curr["date"], curr["fund_code"]) <= (nxt["date"], nxt["fund_code"])
+
+    def test_default_returns_latest_run_only(self, client):
+        """GET /api/signals without all_history keeps the latest-run default."""
+        self._populate_db_multiple(client, n_runs=2)
+
+        from app.db import get_connection, query_signals
+        conn = get_connection()
+        latest = query_signals(conn)  # default = latest run only
+        total = conn.execute("SELECT COUNT(*) FROM signal_item").fetchone()[0]
+        conn.close()
+
+        resp = client.get("/api/signals")
+        data = resp.json()
+        assert len(data) == len(latest)
+        assert len(latest) < total  # two runs exist, latest alone is a subset
+
+    def test_all_history_returns_all_runs(self, client):
+        """GET /api/signals?all_history=true returns signals across all runs."""
+        self._populate_db_multiple(client, n_runs=2)
+
+        from app.db import get_connection
+        conn = get_connection()
+        total = conn.execute("SELECT COUNT(*) FROM signal_item").fetchone()[0]
+        conn.close()
+
+        resp = client.get("/api/signals?all_history=true")
+        data = resp.json()
+        assert len(data) == total
+        assert total >= 2
+
+    def test_all_history_with_fund_code(self, client):
+        """GET /api/signals?fund_code=X&all_history=true returns that fund's full history."""
+        self._populate_db_multiple(client, n_runs=2)
+
+        from app.db import get_connection
+        conn = get_connection()
+        total = conn.execute(
+            "SELECT COUNT(*) FROM signal_item WHERE fund_code = '000001'"
+        ).fetchone()[0]
+        conn.close()
+
+        resp = client.get("/api/signals?fund_code=000001&all_history=true")
+        data = resp.json()
+        assert len(data) == total
+        assert total >= 1
+        for s in data:
+            assert s["fund_code"] == "000001"

@@ -35,6 +35,17 @@ def make_price_df(n_days=50):
 class TestFundDetailMerged:
     ENDPOINT = "/api/funds/000001/detail"
 
+    @staticmethod
+    def _populate_db_for_fund(code="000001"):
+        """Insert a known persisted signal directly into the DB."""
+        from app.db import get_connection, init_db, save_signal_item, save_signal_run
+
+        conn = get_connection()
+        init_db(conn)
+        run_id = save_signal_run(conn, "indicator_cross", "2024-01-15T10:00:00")
+        save_signal_item(conn, run_id, code, "buy", 0.85, "2024-01-15")
+        conn.close()
+
     @patch("app.main.load_fund_price")
     def test_returns_all_sections(self, mock_load, client):
         """Response has detail, nav, signals, strategies — each with expected types."""
@@ -100,3 +111,48 @@ class TestFundDetailMerged:
         assert d["type"] == "股票型"
         assert d["scale"] == 12.5
         assert d["established_date"] == "2020-01-01"
+
+    @patch("app.main.load_fund_price")
+    def test_signals_read_from_db(self, mock_load, client):
+        """Merged detail signals come from persisted DB, not strategy recomputation."""
+        self._populate_db_for_fund()
+        mock_load.return_value = make_price_df()
+
+        resp = client.get(self.ENDPOINT)
+        assert resp.status_code == 200
+        signals = resp.json()["signals"]
+        assert len(signals) >= 1
+        assert signals[0]["fund_code"] == "000001"
+        assert signals[0]["signal_type"] == "buy"
+        assert signals[0]["strategy_name"] == "indicator_cross"
+        assert signals[0]["confidence"] == 0.85
+
+    @patch("app.main.load_fund_price")
+    def test_get_detail_does_not_create_run(self, mock_load, client):
+        """GET /funds/{code}/detail must not persist a new signal run."""
+        self._populate_db_for_fund()
+        mock_load.return_value = make_price_df()
+
+        from app.db import get_connection
+        conn = get_connection()
+        before = conn.execute("SELECT COUNT(*) FROM signal_run").fetchone()[0]
+        conn.close()
+
+        resp = client.get(self.ENDPOINT)
+        assert resp.status_code == 200
+
+        conn = get_connection()
+        after = conn.execute("SELECT COUNT(*) FROM signal_run").fetchone()[0]
+        conn.close()
+        assert after == before
+
+    @patch("app.main.get_strategy")
+    @patch("app.main.load_fund_price")
+    def test_signals_do_not_run_strategies(self, mock_load, mock_get_strategy, client):
+        """Merged detail must not recompute strategies for the signals segment."""
+        self._populate_db_for_fund()
+        mock_load.return_value = make_price_df()
+
+        resp = client.get(self.ENDPOINT)
+        assert resp.status_code == 200
+        mock_get_strategy.assert_not_called()

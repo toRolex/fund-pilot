@@ -86,6 +86,7 @@ def query_signals(
     fund_code: str | None = None,
     run_id: int | None = None,
     strategy: str | None = None,
+    all_history: bool = False,
 ) -> list[dict]:
     sql = """
         SELECT si.fund_code, si.signal, si.value, si.detail, si.date,
@@ -104,7 +105,7 @@ def query_signals(
     if strategy:
         conditions.append("sr.strategy = ?")
         params.append(strategy)
-    if not run_id:
+    if not run_id and not all_history:
         # Default: latest run only
         conditions.append("si.run_id = (SELECT MAX(id) FROM signal_run)")
     if conditions:

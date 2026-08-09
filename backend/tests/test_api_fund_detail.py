@@ -104,6 +104,17 @@ class TestFundNav:
 
 
 class TestFundSignals:
+    @staticmethod
+    def _populate_db_for_fund(code="000001"):
+        """Insert a known persisted signal directly into the DB."""
+        from app.db import get_connection, init_db, save_signal_item, save_signal_run
+
+        conn = get_connection()
+        init_db(conn)
+        run_id = save_signal_run(conn, "indicator_cross", "2024-01-15T10:00:00")
+        save_signal_item(conn, run_id, code, "buy", 0.85, "2024-01-15")
+        conn.close()
+
     @patch("app.main.load_fund_price")
     def test_fund_signals_returns_enriched(self, mock_load, client):
         mock_load.return_value = make_price_df()
@@ -121,6 +132,40 @@ class TestFundSignals:
     def test_fund_signals_not_found(self, client):
         resp = client.get("/api/funds/999999/signals")
         assert resp.status_code == 404
+
+    @patch("app.main.load_fund_price")
+    def test_signals_read_from_db(self, mock_load, client):
+        """Single-fund signals come from persisted DB, not strategy recomputation."""
+        self._populate_db_for_fund()
+        mock_load.return_value = make_price_df()
+
+        resp = client.get("/api/funds/000001/signals")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) >= 1
+        assert data[0]["fund_code"] == "000001"
+        assert data[0]["signal_type"] == "buy"
+        assert data[0]["strategy_name"] == "indicator_cross"
+        assert data[0]["confidence"] == 0.85
+
+    @patch("app.main.load_fund_price")
+    def test_get_signals_does_not_create_run(self, mock_load, client):
+        """GET /funds/{code}/signals must not persist a new signal run."""
+        self._populate_db_for_fund()
+        mock_load.return_value = make_price_df()
+
+        from app.db import get_connection
+        conn = get_connection()
+        before = conn.execute("SELECT COUNT(*) FROM signal_run").fetchone()[0]
+        conn.close()
+
+        resp = client.get("/api/funds/000001/signals")
+        assert resp.status_code == 200
+
+        conn = get_connection()
+        after = conn.execute("SELECT COUNT(*) FROM signal_run").fetchone()[0]
+        conn.close()
+        assert after == before
 
 
 class TestFundStrategies:
