@@ -13,7 +13,7 @@ from app.fund_service import compute_daily_change, compute_holding_pl
 from app.holdings import HoldingsService
 from app.models import AddFundRequest, BacktestRequest, Fund, FundDetail, FundDetailResponse, Holding, HoldingResponse, NavPoint, QdiiPredictResponse, SearchResult, SignalResponse, SignalType, StrategyState, StrategyToggleRequest, SystemStatus, WatchlistFund
 from app.scheduler import get_cache, refresh_signals, start as start_scheduler, stop as stop_scheduler
-from app.strategies import get_fund_enabled_strategies, get_logs, get_strategy, list_strategies, toggle_enabled, toggle_fund_strategy
+from app.strategies import get_fund_enabled_strategies, get_logs, get_strategy, list_strategies, set_fund_strategy, toggle_enabled, toggle_fund_strategy
 from app.watchlist import WatchlistService
 
 import app.backtest as backtest
@@ -387,7 +387,7 @@ async def get_fund_detail_merged(code: str):
         StrategyState(
             name=sm.name,
             description=sm.description,
-            enabled=enabled_map.get(sm.name, True),
+            enabled=enabled_map.get(sm.name, False),
         )
         for sm in list_strategies()
     ]
@@ -447,23 +447,67 @@ async def get_fund_strategies(code: str):
         StrategyState(
             name=sm.name,
             description=sm.description,
-            enabled=enabled_map.get(sm.name, True),
+            enabled=enabled_map.get(sm.name, False),
         )
         for sm in list_strategies()
     ]
 
 
 @api.put("/funds/{code}/strategies/{strategy_name}")
-async def fund_strategy_toggle(code: str, strategy_name: str):
-    """Toggle a strategy on/off for a fund."""
+async def fund_strategy_toggle(code: str, strategy_name: str, body: StrategyToggleRequest | None = None):
+    """Set (with ``{"enabled": bool}`` body) or toggle (no body) a strategy for a fund."""
     fund = watchlist.get(code)
     if not fund:
         raise HTTPException(status_code=404, detail=f"Fund {code} not found")
     try:
-        enabled = toggle_fund_strategy(code, strategy_name)
+        if body is not None:
+            enabled = set_fund_strategy(code, strategy_name, body.enabled)
+        else:
+            enabled = toggle_fund_strategy(code, strategy_name)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Strategy '{strategy_name}' not found")
     return {"name": strategy_name, "enabled": enabled}
+
+
+@api.post("/funds/{code}/strategies/{strategy_name}/run")
+async def run_fund_strategy(code: str, strategy_name: str):
+    """Enable a strategy for a fund, run it once immediately, persist results.
+
+    Returns the latest SignalResponse[] for this fund + strategy (the run just created).
+    """
+    from app.signal_service import run_signals as execute_signals
+
+    fund = watchlist.get(code)
+    if not fund:
+        raise HTTPException(status_code=404, detail=f"Fund {code} not found")
+
+    sm = None
+    for s in list_strategies():
+        if s.name == strategy_name:
+            sm = s
+            break
+    if sm is None:
+        raise HTTPException(status_code=404, detail=f"Strategy '{strategy_name}' not found")
+
+    # Persist enabled=true for this fund + strategy
+    set_fund_strategy(code, strategy_name, True)
+
+    try:
+        price_df = load_fund_price(code)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    conn = get_db_connection()
+    init_db(conn)
+    try:
+        execute_signals(conn, [sm], [fund], {code: price_df})
+        rows = query_signals(conn, fund_code=code, strategy=strategy_name)
+    finally:
+        conn.close()
+
+    funds_map = {f.code: f for f in watchlist.list_all()}
+    daily_change = compute_daily_change(price_df)
+    return [_row_to_signal_response(row, funds_map, daily_change) for row in rows]
 
 
 @api.get("/qdii/{code}")

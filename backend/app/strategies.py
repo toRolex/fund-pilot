@@ -7,6 +7,12 @@ import datetime
 
 import pandas as pd
 
+from app.db import (
+    get_connection as get_db_connection,
+    get_fund_strategy_state,
+    init_db,
+    set_fund_strategy_state,
+)
 from app.models import Signal, SignalType, StrategyLog, StrategyMeta
 
 
@@ -40,9 +46,6 @@ def _add_log(message: str):
 def get_logs(limit: int = 50) -> list[StrategyLog]:
     return _logs[-limit:]
 
-# ponytail: in-memory per-fund strategy enable/disable, file persistence if needs to survive restart
-_FUND_ENABLED: dict[str, dict[str, bool]] = {}
-
 
 def register(name: str, meta: StrategyMeta, fn: callable):
     """Register a strategy function."""
@@ -73,19 +76,45 @@ def get_strategy(name: str) -> callable:
 
 
 def get_fund_enabled_strategies(fund_code: str) -> dict[str, bool]:
-    """Get enabled/disabled state for all strategies for a fund."""
-    if fund_code not in _FUND_ENABLED:
-        _FUND_ENABLED[fund_code] = {name: True for name, _ in _REGISTRY.items()}
-    return _FUND_ENABLED[fund_code]
+    """Get enabled/disabled state for all strategies for a fund (persisted).
+
+    Unknown fund/strategy rows default to disabled (spec Q9 默认全关).
+    """
+    conn = get_db_connection()
+    init_db(conn)
+    try:
+        stored = get_fund_strategy_state(conn, fund_code)
+    finally:
+        conn.close()
+    return {name: stored.get(name, False) for name, _ in _REGISTRY.items()}
 
 
 def toggle_fund_strategy(fund_code: str, strategy_name: str) -> bool:
     """Toggle a strategy for a fund. Returns the new enabled state."""
     if strategy_name not in _REGISTRY:
         raise KeyError(f"Strategy '{strategy_name}' not found")
-    enabled_map = get_fund_enabled_strategies(fund_code)
-    enabled_map[strategy_name] = not enabled_map.get(strategy_name, True)
-    return enabled_map[strategy_name]
+    conn = get_db_connection()
+    init_db(conn)
+    try:
+        current = get_fund_strategy_state(conn, fund_code).get(strategy_name, False)
+        new_state = not current
+        set_fund_strategy_state(conn, fund_code, strategy_name, new_state)
+    finally:
+        conn.close()
+    return new_state
+
+
+def set_fund_strategy(fund_code: str, strategy_name: str, enabled: bool) -> bool:
+    """Set a strategy for a fund to a specific enabled state (persisted)."""
+    if strategy_name not in _REGISTRY:
+        raise KeyError(f"Strategy '{strategy_name}' not found")
+    conn = get_db_connection()
+    init_db(conn)
+    try:
+        set_fund_strategy_state(conn, fund_code, strategy_name, enabled)
+    finally:
+        conn.close()
+    return enabled
 
 
 def indicator_cross(price_df: pd.DataFrame, params: dict | None = None) -> list[Signal]:
