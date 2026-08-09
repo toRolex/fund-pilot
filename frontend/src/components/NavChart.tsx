@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { NavPoint, SignalResponse, SignalType } from "@/types";
 import {
   SignalBuyMarker,
@@ -7,7 +7,13 @@ import {
 } from "@/components/SignalBadge";
 
 // ── 交互状态形状（spec）：区间 key + brush 选区 [startIdx, endIdx] ───────────
-type RangeKey = "1m" | "3m" | "6m" | "1y" | "all";
+export type RangeKey = "1m" | "3m" | "6m" | "1y" | "all";
+
+// T6 键盘快捷键：详情页通过 ref 调用 NavChart 的区间切换 / 平移
+export interface NavChartHandle {
+  setRange(key: RangeKey): void;
+  pan(direction: -1 | 1): void;
+}
 
 const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
   { key: "1m", label: "近1月" },
@@ -179,7 +185,12 @@ interface BrushDrag {
 }
 
 // ── NavChart：快捷区间 + brush 缩放 + 十字光标 + 区间统计 ─────────────────────
-export function NavChart({ nav, signals }: { nav: NavPoint[]; signals: SignalResponse[] }) {
+type NavChartProps = { nav: NavPoint[]; signals: SignalResponse[] };
+
+export const NavChart = forwardRef<NavChartHandle, NavChartProps>(function NavChart(
+  { nav, signals },
+  ref,
+) {
   const [range, setRange] = useState<RangeKey | null>("all");
   const [win, setWin] = useState<[number, number]>([0, 0]);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
@@ -229,6 +240,31 @@ export function NavChart({ nav, signals }: { nav: NavPoint[]; signals: SignalRes
     setRange(key);
     setHoverIdx(null);
   }
+
+  // T6 键盘平移：将可见窗口左/右移动窗口宽度的 10%（至少 1 格），并清除快捷区间选中态
+  function pan(direction: -1 | 1) {
+    if (n === 0) return;
+    const span = endIdx - startIdx;
+    const step = Math.max(1, Math.round(span * 0.1));
+    let s = startIdx + direction * step;
+    let e = endIdx + direction * step;
+    if (s < 0) {
+      s = 0;
+      e = Math.min(span, n - 1);
+    }
+    if (e > n - 1) {
+      e = n - 1;
+      s = Math.max(0, e - span);
+    }
+    setWin([s, e]);
+    setRange(null);
+    setHoverIdx(null);
+  }
+
+  useImperativeHandle(ref, () => ({
+    setRange: handleRange,
+    pan,
+  }));
 
   function onBrushPointerDown(e: React.PointerEvent<SVGSVGElement>) {
     if (n === 0) return;
@@ -608,4 +644,4 @@ export function NavChart({ nav, signals }: { nav: NavPoint[]; signals: SignalRes
       </div>
     </div>
   );
-}
+});
