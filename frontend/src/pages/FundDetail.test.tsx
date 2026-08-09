@@ -219,6 +219,167 @@ describe("FundDetail", () => {
     fetchSpy.mockRestore();
   });
 
+  describe("Strategy panel (T5)", () => {
+    const fullNav: NavPoint[] = Array.from({ length: 130 }, (_, i) => {
+      const d = new Date(Date.UTC(2024, 0, 1 + i));
+      return { date: d.toISOString().slice(0, 10), netvalue: Number((1 + i * 0.01).toFixed(4)) };
+    });
+
+    const allOff: StrategyState[] = [
+      { name: "indicator_cross", description: "均线交叉策略", enabled: false },
+      { name: "pe_percentile", description: "PE 百分位策略", enabled: false },
+      { name: "grid", description: "网格策略", enabled: false },
+    ];
+
+    function makeSignalsFor(name: string): SignalResponse[] {
+      return [
+        { date: fullNav[5].date, fund_code: "000001", fund_name: mockFund.name, strategy_name: name, signal_type: "buy", confidence: 0.8, daily_change: 0.5 },
+        { date: fullNav[125].date, fund_code: "000001", fund_name: mockFund.name, strategy_name: name, signal_type: "sell", confidence: 0.7, daily_change: 0.3 },
+      ];
+    }
+
+    // 有状态 mock：enable → POST run（生成信号）；disable → PUT 关；GET /signals 返回当前信号库
+    function mockToggleApi(initial: { strategies?: StrategyState[]; signals?: SignalResponse[] } = {}) {
+      const strategies: StrategyState[] = initial.strategies ?? allOff;
+      const signals: SignalResponse[] = initial.signals ?? [];
+      const calls: { url: string; method: string }[] = [];
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      fetchSpy.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        calls.push({ url, method });
+
+        const runMatch = url.match(/\/api\/funds\/000001\/strategies\/([^/]+)\/run$/);
+        if (method === "POST" && runMatch) {
+          const name = runMatch[1];
+          const s = strategies.find((x) => x.name === name);
+          if (s) s.enabled = true;
+          const gen = makeSignalsFor(name);
+          signals.length = 0;
+          signals.push(...gen);
+          return json(gen);
+        }
+
+        const putMatch = url.match(/\/api\/funds\/000001\/strategies\/([^/]+)$/);
+        if (method === "PUT" && putMatch) {
+          const name = putMatch[1];
+          const s = strategies.find((x) => x.name === name);
+          if (s) s.enabled = false;
+          return json({ name, enabled: false });
+        }
+
+        if (url.includes("/api/funds/000001/strategies")) return json(strategies);
+        if (url.includes("/api/signals")) return json(signals);
+        if (url.includes("/api/funds/000001/nav")) return json(fullNav);
+        if (url.includes("/api/qdii/")) return json({ code: "000001", t1_value: 1.24, t1_date: "2024-01-02", t0_value: 1.235, t0_date: "2024-01-01" });
+        if (url.includes("/api/funds/000001")) return json(mockFund);
+        return json({ detail: "not found" }, 404);
+      });
+      return { fetchSpy, calls };
+    }
+
+    it("renders three non-multi_fund switches, all off, no chart markers", async () => {
+      // 信号存在于接口，但策略默认全关 → 图上不打标、信号流为空
+      const { fetchSpy } = mockToggleApi({ signals: makeSignalsFor("indicator_cross") });
+      render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+      await waitFor(() => expect(screen.getAllByRole("switch")).toHaveLength(3));
+      screen.getAllByRole("switch").forEach((sw) => expect(sw).toHaveAttribute("aria-checked", "false"));
+      expect(screen.queryByTestId(/signal-marker-/)).not.toBeInTheDocument();
+      expect(screen.getByText("暂无历史信号")).toBeInTheDocument();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("enabling a strategy calls run endpoint and shows markers + signal flow", async () => {
+      const { fetchSpy, calls } = mockToggleApi();
+      render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+      await waitFor(() => expect(screen.getAllByRole("switch")).toHaveLength(3));
+      fireEvent.click(screen.getByRole("switch", { name: "均线" }));
+
+      await waitFor(() => {
+        expect(calls.some((c) => c.method === "POST" && c.url.includes("/strategies/indicator_cross/run"))).toBe(true);
+      });
+      await waitFor(() => expect(screen.getAllByTestId("signal-marker-buy").length).toBeGreaterThan(0));
+      expect(screen.getAllByTestId("signal-marker-sell").length).toBeGreaterThan(0);
+      await waitFor(() => expect(screen.getAllByText("indicator_cross").length).toBeGreaterThan(0));
+
+      fetchSpy.mockRestore();
+    });
+
+    it("disabling an enabled strategy hides its markers and clears signal flow", async () => {
+      const { fetchSpy, calls } = mockToggleApi({
+        strategies: [
+          { name: "indicator_cross", description: "均线交叉策略", enabled: true },
+          { name: "pe_percentile", description: "PE 百分位策略", enabled: false },
+          { name: "grid", description: "网格策略", enabled: false },
+        ],
+        signals: makeSignalsFor("indicator_cross"),
+      });
+      render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+      await waitFor(() => expect(screen.getAllByTestId("signal-marker-buy").length).toBeGreaterThan(0));
+      fireEvent.click(screen.getByRole("switch", { name: "均线" }));
+
+      await waitFor(() => {
+        expect(calls.some((c) => c.method === "PUT" && c.url.includes("/strategies/indicator_cross"))).toBe(true);
+      });
+      await waitFor(() => expect(screen.queryAllByTestId(/signal-marker-/)).toHaveLength(0));
+      expect(screen.getByText("暂无历史信号")).toBeInTheDocument();
+      expect(screen.queryByText("indicator_cross")).not.toBeInTheDocument();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("shows default params tooltip on hover over a strategy switch", async () => {
+      const { fetchSpy } = mockToggleApi();
+      render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+      await waitFor(() => expect(screen.getAllByRole("switch")).toHaveLength(3));
+      expect(screen.queryByTestId("strategy-hint-indicator_cross")).not.toBeInTheDocument();
+
+      fireEvent.mouseEnter(screen.getByTestId("strategy-item-indicator_cross"));
+      expect(screen.getByTestId("strategy-hint-indicator_cross")).toHaveTextContent("均线 5/20");
+
+      fetchSpy.mockRestore();
+    });
+
+    it("does not render inline parameter forms", async () => {
+      const { fetchSpy } = mockToggleApi();
+      render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+      await waitFor(() => expect(screen.getAllByRole("switch")).toHaveLength(3));
+      expect(screen.queryByRole("form")).not.toBeInTheDocument();
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("reads back persisted enabled state without triggering run", async () => {
+      const { fetchSpy, calls } = mockToggleApi({
+        strategies: [
+          { name: "indicator_cross", description: "均线交叉策略", enabled: true },
+          { name: "pe_percentile", description: "PE 百分位策略", enabled: false },
+          { name: "grid", description: "网格策略", enabled: false },
+        ],
+        signals: makeSignalsFor("indicator_cross"),
+      });
+      render(<FundDetail />, { wrapper: createWrapper("000001") });
+
+      await waitFor(() => {
+        expect(screen.getByRole("switch", { name: "均线" })).toHaveAttribute("aria-checked", "true");
+      });
+      // 读回持久化状态，不触发 run
+      expect(calls.some((c) => c.method === "POST" && c.url.includes("/run"))).toBe(false);
+      expect(screen.getAllByTestId("signal-marker-buy").length).toBeGreaterThan(0);
+
+      fetchSpy.mockRestore();
+    });
+  });
+
   describe("QDII Prediction", () => {
     const qdiiFund = { ...mockFund, type: "QDII", name: "QDII测试基金" };
 

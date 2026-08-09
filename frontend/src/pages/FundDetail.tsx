@@ -4,12 +4,10 @@ import { SignalBadge } from "@/components/SignalBadge";
 import { ConfidenceBar } from "@/components/ConfidenceBar";
 import { ErrorState } from "@/components/ErrorState";
 import { NavChart } from "@/components/NavChart";
-import type { SignalResponse, StrategyState } from "@/types";
+import { StrategyPanel, DETAIL_PANEL_STRATEGIES } from "@/components/StrategyPanel";
+import type { SignalResponse } from "@/types";
 import { useQuery } from "@tanstack/react-query";
-import {
-  useFundDetail,
-  useToggleFundStrategy,
-} from "@/hooks/useFund";
+import { useFundDetail } from "@/hooks/useFund";
 import { api } from "@/lib/api";
 
 function LoadingSkeleton() {
@@ -65,40 +63,6 @@ function SignalTable({ signals }: { signals: SignalResponse[] }) {
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-// ── Strategy Sidebar (CSS toggle) ────────────────────────────────────────────
-function StrategiesSidebar({ strategies, code }: { strategies: StrategyState[]; code: string }) {
-  const toggleMutation = useToggleFundStrategy(code);
-
-  return (
-    <div className=" bg-[#16161E] border border-white/5 p-4">
-      <div className="text-xs text-gray-400 mb-4 tracking-wider">运行策略</div>
-      {(!strategies || strategies.length === 0) ? (
-        <p className="text-xs text-gray-500">暂无策略</p>
-      ) : (
-        <div>
-          {strategies.map((s) => (
-            <div key={s.name} style={{ padding: "var(--space-3) 0", borderBottom: "1px solid var(--border)" }}>
-              <div className="text-sm font-medium text-white mb-1">{s.name}</div>
-              <div className="text-xs text-gray-400 mb-2">{s.description}</div>
-              <div className="toggle-wrap">
-                <div
-                  className={`toggle${s.enabled ? " active" : ""}`}
-                  onClick={() => toggleMutation.mutate(s.name)}
-                  role="switch"
-                  aria-checked={s.enabled}
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleMutation.mutate(s.name); } }}
-                />
-                <span className="toggle-label">{s.enabled ? "已启用" : "已禁用"}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -181,6 +145,17 @@ export function FundDetail() {
   const signals = merged.signals;
   const strategies = merged.strategies;
 
+  // 仅渲染已启用的面板策略信号：关闭策略 → 图上标记与右侧信号流隐去；
+  // multi_fund（momentum）信号不在详情页展示。
+  const enabledPanelStrategies = new Set(
+    (strategies ?? [])
+      .filter((s) => s.enabled && s.name in DETAIL_PANEL_STRATEGIES)
+      .map((s) => s.name),
+  );
+  const visibleSignals = (signals ?? []).filter((s) =>
+    enabledPanelStrategies.has(s.strategy_name),
+  );
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Back link */}
@@ -228,14 +203,14 @@ export function FundDetail() {
       {fund.type?.includes("QDII") && <QdiiPredictCard code={fund.code} />}
       <div className="content-grid">
         <div className="main-col">
-          <NavChart nav={nav ?? []} signals={signals ?? []} />
+          <NavChart nav={nav ?? []} signals={visibleSignals} />
           <div>
             <h2 className="mb-3 text-sm font-semibold text-white">历史信号</h2>
-            <SignalTable signals={signals ?? []} />
+            <SignalTable signals={visibleSignals} />
           </div>
         </div>
         <div>
-          <StrategiesSidebar strategies={strategies} code={code ?? ""} />
+          <StrategyPanel strategies={strategies ?? []} code={code ?? ""} />
         </div>
       </div>
     </div>

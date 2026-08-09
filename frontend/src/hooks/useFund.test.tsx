@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useFundDetail } from "./useFund";
+import { useFundDetail, useSetFundStrategy } from "./useFund";
 
 function createWrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -83,5 +83,36 @@ describe("useFundDetail", () => {
     });
 
     expect(result.current.fetchStatus).toBe("idle");
+  });
+});
+
+describe("useSetFundStrategy", () => {
+  it("enabling calls run endpoint, disabling calls PUT with enabled false", async () => {
+    const calls: { url: string; method: string; body?: unknown }[] = [];
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), method: init?.method ?? "GET", body: init?.body });
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+
+    const { result } = renderHook(() => useSetFundStrategy("000001"), {
+      wrapper: createWrapper(),
+    });
+
+    result.current.mutate({ name: "indicator_cross", enabled: true });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    result.current.reset();
+
+    result.current.mutate({ name: "indicator_cross", enabled: false });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(calls).toContainEqual(
+      expect.objectContaining({ url: "/api/funds/000001/strategies/indicator_cross/run", method: "POST" }),
+    );
+    const putCall = calls.find((c) => c.method === "PUT");
+    expect(putCall).toMatchObject({ url: "/api/funds/000001/strategies/indicator_cross" });
+    expect(JSON.parse(String(putCall?.body))).toEqual({ enabled: false });
+
+    fetchMock.mockRestore();
   });
 });
